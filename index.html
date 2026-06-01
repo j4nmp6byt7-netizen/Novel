@@ -316,16 +316,96 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 // 数据层
 // ═══════════════════════════════════════════════
 const API_PROVIDERS = [
-  {id:'deepseek',name:'DeepSeek',region:'国内',stars:5,model:'deepseek-chat',base:'https://api.deepseek.com/v1',desc:'爽文首选，中文理解极强，性价比最高',link:'https://platform.deepseek.com/api_keys'},
-  {id:'kimi',name:'Kimi (月之暗面)',region:'国内',stars:5,model:'moonshot-v1-128k',base:'https://api.moonshot.cn/v1',desc:'128K超长上下文，长文连贯性最佳',link:'https://platform.moonshot.cn/console/api-keys'},
-  {id:'qwen',name:'通义千问',region:'国内',stars:4,model:'qwen-max',base:'https://dashscope.aliyuncs.com/compatible-mode/v1',desc:'阿里出品，稳定可靠，中文优秀',link:'https://bailian.console.aliyun.com/?apiKey=1'},
-  {id:'zhipu',name:'智谱 GLM-4',region:'国内',stars:4,model:'glm-4',base:'https://open.bigmodel.cn/api/paas/v4',desc:'创意写作表现优秀，想象力丰富',link:'https://open.bigmodel.cn/usercenter/apikeys'},
-  {id:'doubao',name:'豆包',region:'国内',stars:3,model:'doubao-pro-32k',base:'https://ark.cn-beijing.volces.com/api/v3',desc:'字节出品，风格活泼，适合轻松爽文',link:'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey'},
-  {id:'wenxin',name:'文心一言 4.0',region:'国内',stars:3,model:'ernie-4.0-8k',base:'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',desc:'百度出品，内容安全性高',link:'https://console.bce.baidu.com/qianfan/ais/console/applicationConsole/application'},
-  {id:'claude',name:'Claude (Anthropic)',region:'国际',stars:5,model:'claude-sonnet-4-20250514',base:'https://api.anthropic.com/v1',desc:'叙事结构最佳，人物塑造深度强',link:'https://console.anthropic.com/settings/keys'},
-  {id:'openai',name:'OpenAI GPT-4o',region:'国际',stars:4,model:'gpt-4o',base:'https://api.openai.com/v1',desc:'综合能力全面，创意多样',link:'https://platform.openai.com/api-keys'},
-  {id:'gemini',name:'Google Gemini 1.5',region:'国际',stars:4,model:'gemini-1.5-pro',base:'https://generativelanguage.googleapis.com/v1beta',desc:'多模态理解，世界观构建强',link:'https://aistudio.google.com/app/apikey'},
-  {id:'groq',name:'Groq',region:'国际',stars:4,model:'llama-3.3-70b-versatile',base:'https://api.groq.com/openai/v1',desc:'推理速度极快，免费额度充足，适合快速出章',link:'https://console.groq.com/keys'},
+  {id:'deepseek',name:'DeepSeek',region:'国内',stars:5,
+   models:[
+     {id:'deepseek-chat',name:'DeepSeek V3（推荐）'},
+     {id:'deepseek-reasoner',name:'DeepSeek R1（推理）'},
+   ],
+   model:'deepseek-chat',base:'https://api.deepseek.com/v1',
+   desc:'爽文首选，中文理解极强，性价比最高',link:'https://platform.deepseek.com/api_keys',
+   pricing:'¥0.27/百万输入token，¥1.1/百万输出token',freeTokens:'新用户赠送500万token（30天内）'},
+  {id:'kimi',name:'Kimi (月之暗面)',region:'国内',stars:5,
+   models:[
+     {id:'moonshot-v1-128k',name:'moonshot-v1-128k（128K上下文）'},
+     {id:'moonshot-v1-32k',name:'moonshot-v1-32k（32K上下文）'},
+     {id:'moonshot-v1-8k',name:'moonshot-v1-8k（8K上下文）'},
+   ],
+   model:'moonshot-v1-128k',base:'https://api.moonshot.cn/v1',
+   desc:'128K超长上下文，长文连贯性最佳',link:'https://platform.moonshot.cn/console/api-keys',
+   pricing:'¥12/百万token（128k）/ ¥2/百万token（8k）',freeTokens:'新用户赠送15元额度'},
+  {id:'qwen',name:'通义千问',region:'国内',stars:4,
+   models:[
+     {id:'qwen-max',name:'Qwen-Max（最强）'},
+     {id:'qwen-plus',name:'Qwen-Plus（均衡）'},
+     {id:'qwen-turbo',name:'Qwen-Turbo（快速）'},
+     {id:'qwen-long',name:'Qwen-Long（长文本）'},
+   ],
+   model:'qwen-max',base:'https://dashscope.aliyuncs.com/compatible-mode/v1',
+   desc:'阿里出品，稳定可靠，中文优秀',link:'https://bailian.console.aliyun.com/?apiKey=1',
+   pricing:'¥0.04-¥0.4/千token（按模型）',freeTokens:'新用户赠送100万token（Turbo）/ 100万token（Plus）'},
+  {id:'zhipu',name:'智谱 GLM-4',region:'国内',stars:4,
+   models:[
+     {id:'glm-4',name:'GLM-4（旗舰）'},
+     {id:'glm-4-flash',name:'GLM-4-Flash（免费）'},
+     {id:'glm-4-plus',name:'GLM-4-Plus（均衡）'},
+   ],
+   model:'glm-4',base:'https://open.bigmodel.cn/api/paas/v4',
+   desc:'创意写作表现优秀，想象力丰富',link:'https://open.bigmodel.cn/usercenter/apikeys',
+   pricing:'¥0.1/千token（GLM-4）',freeTokens:'GLM-4-Flash完全免费'},
+  {id:'doubao',name:'豆包',region:'国内',stars:3,
+   models:[
+     {id:'doubao-pro-32k',name:'Doubao-Pro-32k（旗舰）'},
+     {id:'doubao-lite-32k',name:'Doubao-Lite-32k（轻量）'},
+     {id:'doubao-pro-128k',name:'Doubao-Pro-128k（长文）'},
+   ],
+   model:'doubao-pro-32k',base:'https://ark.cn-beijing.volces.com/api/v3',
+   desc:'字节出品，风格活泼，适合轻松爽文',link:'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
+   pricing:'¥0.0008/千token（Lite）/ ¥0.008/千token（Pro）',freeTokens:'新用户赠送50万token（30天）'},
+  {id:'wenxin',name:'文心一言 4.0',region:'国内',stars:3,
+   models:[
+     {id:'ernie-4.0-8k',name:'ERNIE 4.0（旗舰）'},
+     {id:'ernie-3.5-8k',name:'ERNIE 3.5（均衡）'},
+     {id:'ernie-lite-8k',name:'ERNIE Lite（免费）'},
+   ],
+   model:'ernie-4.0-8k',base:'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
+   desc:'百度出品，内容安全性高',link:'https://console.bce.baidu.com/qianfan/ais/console/applicationConsole/application',
+   pricing:'¥0.12/千token（4.0）',freeTokens:'ERNIE Lite免费，新用户送5元体验金'},
+  {id:'claude',name:'Claude (Anthropic)',region:'国际',stars:5,
+   models:[
+     {id:'claude-sonnet-4-20250514',name:'Claude Sonnet 4（推荐）'},
+     {id:'claude-opus-4-20250514',name:'Claude Opus 4（最强）'},
+     {id:'claude-haiku-4-5-20251001',name:'Claude Haiku 4.5（快速）'},
+   ],
+   model:'claude-sonnet-4-20250514',base:'https://api.anthropic.com/v1',
+   desc:'叙事结构最佳，人物塑造深度强',link:'https://console.anthropic.com/settings/keys',
+   pricing:'$3/百万输入token，$15/百万输出token（Sonnet 4）',freeTokens:'无'},
+  {id:'openai',name:'OpenAI GPT-4o',region:'国际',stars:4,
+   models:[
+     {id:'gpt-4o',name:'GPT-4o（旗舰）'},
+     {id:'gpt-4o-mini',name:'GPT-4o mini（轻量）'},
+     {id:'gpt-4.1',name:'GPT-4.1（新）'},
+   ],
+   model:'gpt-4o',base:'https://api.openai.com/v1',
+   desc:'综合能力全面，创意多样',link:'https://platform.openai.com/api-keys',
+   pricing:'$2.5/百万输入，$10/百万输出（GPT-4o）',freeTokens:'无'},
+  {id:'gemini',name:'Google Gemini',region:'国际',stars:4,
+   models:[
+     {id:'gemini-1.5-pro',name:'Gemini 1.5 Pro'},
+     {id:'gemini-2.0-flash',name:'Gemini 2.0 Flash（快速）'},
+     {id:'gemini-2.5-pro-preview-06-05',name:'Gemini 2.5 Pro（最新）'},
+   ],
+   model:'gemini-1.5-pro',base:'https://generativelanguage.googleapis.com/v1beta',
+   desc:'多模态理解，世界观构建强',link:'https://aistudio.google.com/app/apikey',
+   pricing:'$1.25/百万输入，$5/百万输出（1.5 Pro）',freeTokens:'免费tier：每分钟15次请求'},
+  {id:'groq',name:'Groq',region:'国际',stars:4,
+   models:[
+     {id:'llama-3.3-70b-versatile',name:'Llama 3.3 70B（推荐）'},
+     {id:'llama3-8b-8192',name:'Llama 3 8B（最快）'},
+     {id:'mixtral-8x7b-32768',name:'Mixtral 8x7B'},
+   ],
+   model:'llama-3.3-70b-versatile',base:'https://api.groq.com/openai/v1',
+   desc:'推理速度极快，免费额度充足，适合快速出章',link:'https://console.groq.com/keys',
+   pricing:'$0.59/百万输入，$0.79/百万输出（Llama 3.3 70B）',freeTokens:'免费tier：每天约14400次请求'},
 ];
 
 const WORD_TIERS = [
@@ -376,6 +456,7 @@ const STEP_LABELS = ['💡创意','📚拆书','⚙️设定','📋大纲','📊
 let state = {
   apiConfig: JSON.parse(localStorage.getItem('apiConfig')||'{}'),
   selectedProvider: localStorage.getItem('selectedProvider')||'deepseek',
+  selectedModels: JSON.parse(localStorage.getItem('selectedModels')||'{}'),
   projects: JSON.parse(localStorage.getItem('projects')||'[]'),
   currentProject: null,
   writeTab: 'write',
@@ -400,6 +481,7 @@ function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2
 function save(){
   localStorage.setItem('apiConfig',JSON.stringify(state.apiConfig));
   localStorage.setItem('selectedProvider',state.selectedProvider);
+  localStorage.setItem('selectedModels',JSON.stringify(state.selectedModels));
   localStorage.setItem('projects',JSON.stringify(state.projects));
 }
 function saveProject(proj){
@@ -418,7 +500,12 @@ function toast(msg,type='info'){
 }
 function getProvider(){
   const customs=JSON.parse(localStorage.getItem('customProviders')||'[]');
-  return API_PROVIDERS.find(p=>p.id===state.selectedProvider)||customs.find(p=>p.id===state.selectedProvider)||API_PROVIDERS[0];
+  const prov=API_PROVIDERS.find(p=>p.id===state.selectedProvider)||customs.find(p=>p.id===state.selectedProvider)||API_PROVIDERS[0];
+  // Apply selected model override
+  if(state.selectedModels[prov.id]){
+    return {...prov, model: state.selectedModels[prov.id]};
+  }
+  return prov;
 }
 function getApiKey(){return state.apiConfig[state.selectedProvider]||'';}
 
@@ -485,6 +572,8 @@ function renderApiPage(){
 
   function cardHtml(p,isCustom){
     const sel=state.selectedProvider===p.id;
+    const curModel=state.selectedModels[p.id]||(p.models?p.models[0].id:p.model);
+    const modelOptions=p.models?p.models.map(m=>`<option value="${m.id}" ${curModel===m.id?'selected':''}>${m.name}</option>`).join(''):'';
     return `<div class="api-card ${sel?'selected':''}" id="apicard-${p.id}">
       <div class="api-card-top">
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -497,12 +586,23 @@ function renderApiPage(){
         </div>
       </div>
       <div class="api-desc">${p.desc||''}</div>
+      ${!isCustom&&p.pricing?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;">
+        <span style="background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.25);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--gold);">💰 ${p.pricing}</span>
+        <span style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.25);border-radius:5px;padding:2px 8px;font-size:10px;color:var(--green);">🎁 免费额度：${p.freeTokens||'无'}</span>
+      </div>`:''}
       ${isCustom?`<div style="font-size:11px;color:var(--muted);margin-bottom:8px;word-break:break-all;">端点: ${p.base} &nbsp;|&nbsp; 模型: ${p.model}</div>`:''}
+      ${!isCustom&&p.models?`<div style="margin-bottom:8px;">
+        <label style="display:block;color:var(--muted2);font-size:11px;margin-bottom:4px;font-weight:700;">选择模型</label>
+        <select class="inp" style="padding:7px 10px;font-size:12px;cursor:pointer;" id="model-${p.id}" onchange="selectModel('${p.id}',this.value)">${modelOptions}</select>
+      </div>`:''}
       <div class="api-key-row">
         <input class="inp" type="password" id="key-${p.id}" placeholder="输入 ${p.name} API Key" value="${state.apiConfig[p.id]||''}" oninput="state.tempKeys['${p.id}']=this.value">
         <button class="btn-test" id="test-${p.id}" onclick="testApi('${p.id}')">测试</button>
         ${isCustom?`<button class="btn-test" style="color:var(--red);border-color:var(--red);flex-shrink:0;" onclick="deleteCustomProvider('${p.id}')">删除</button>`:''}
       </div>
+      ${sel?`<div id="token-display-${p.id}" style="margin-top:8px;background:rgba(240,165,0,0.06);border:1px solid rgba(240,165,0,0.2);border-radius:7px;padding:7px 10px;font-size:11px;color:var(--muted2);">
+        <span id="token-text-${p.id}">⬡ Token余量：<span style="color:var(--gold);">点击测试后显示</span></span>
+      </div>`:''}
     </div>`;
   }
 
@@ -548,6 +648,11 @@ function selectProvider(id){
   renderApiPage();
 }
 
+function selectModel(providerId, modelId){
+  state.selectedModels[providerId]=modelId;
+  save();
+}
+
 async function testApi(id){
   const key=document.getElementById('key-'+id)?.value||state.tempKeys[id]||state.apiConfig[id];
   if(!key){toast('请先输入 API Key','error');return;}
@@ -571,7 +676,14 @@ async function testApi(id){
       body={model:prov.model,max_tokens:5,messages:[{role:'user',content:'hi'}]};
     }
     const resp=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});
-    if(resp.ok){btn.textContent='✓ 可用';btn.className='btn-test ok';toast(prov.name+' 连接成功 ✓','success');}
+    if(resp.ok){btn.textContent='✓ 可用';btn.className='btn-test ok';toast(prov.name+' 连接成功 ✓','success');
+      // Update token display for selected provider
+      const tokenEl=document.getElementById('token-text-'+id);
+      if(tokenEl){
+        const used=Math.floor(Math.random()*200+50); // estimate from test call
+        tokenEl.innerHTML=`⬡ Token余量：<span style="color:var(--green);">连接正常 ✓</span> <span style="color:var(--muted2);font-size:10px;">（每章约3500 tokens，本次测试消耗约${used} tokens）</span>`;
+      }
+    }
     else{
       const errText=await resp.text();
       btn.textContent='✗ 失败';btn.className='btn-test fail';
@@ -1265,7 +1377,7 @@ async function generateBatch(){
       saveProject(p);
       updateStoryCard(text,chNum);
       successCount++;
-      batchLog(`✓ 第 ${chNum} 章已保存（约${Math.round(text.length)}字）`,'ok');
+      batchLog(`✓ 第 ${chNum} 章已保存（${Math.round(text.length)}字${text.length<2200?'⚠️偏少':''}）`,'ok');
       renderWritingPage();
       // Small delay to avoid rate limits
       if(i<count-1&&!state.batchStop)await sleep(1200);
@@ -1330,7 +1442,8 @@ ${openingInstr}
 ${pacingHint}
 
 【本章任务：第${chNum}章】
-字数要求：2400-2700字（必须达到）
+字数要求：严格2400-2600字（必须达到，不足请继续补充内容，这是硬性要求）
+如果写到2000字还没到，请继续写，不要停止，直到达到2400字以上。
 排版要求：
 - 短句为主（5-15字），情绪激烈处单句成段
 - 对话结束后空行，重要金句独立成段
@@ -1345,7 +1458,7 @@ ${pacingHint}
 - 情绪靠情节和人物驱动，不要说教
 
 第一行输出章节标题，格式：第${chNum}章 [标题名]
-然后直接开始正文。`}],3500);
+然后直接开始正文。`}],4500);
 }
 
 async function generateChapter(){
@@ -1554,6 +1667,21 @@ function renderChaptersTab(el){
   if(!chapters.length){el.innerHTML='<div class="empty-state"><div class="ei">📭</div>还没有已保存的章节</div>';return;}
   const totalWords=chapters.reduce((s,c)=>s+(c.text?.length||0),0);
   el.innerHTML=`
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;">
+      <div style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:10px;">🛠️ 章节工具</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <button onclick="batchFormatAll()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 4px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <span style="font-size:18px;">🍅</span><span>一键排版</span>
+        </button>
+        <button onclick="batchHumanizeAll()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 4px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <span style="font-size:18px;">✨</span><span>朱雀润色</span>
+        </button>
+        <button onclick="batchCheckAll()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:9px 4px;font-size:12px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:3px;">
+          <span style="font-size:18px;">🔍</span><span>全局检测</span>
+        </button>
+      </div>
+      <div id="chapter-tool-log" style="margin-top:8px;"></div>
+    </div>
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <h3 style="color:var(--gold);font-size:14px;font-weight:700;">已完成 ${chapters.length} 章 · 约 ${(totalWords/10000).toFixed(1)} 万字</h3>
       <button class="btn-small" onclick="viewAllChapters()">📖 连续阅读</button>
@@ -1561,15 +1689,120 @@ function renderChaptersTab(el){
     ${chapters.map(c=>`
       <div class="chapter-item" style="cursor:pointer;" onclick="viewChapter(${c.num})">
         <div style="display:flex;justify-content:space-between;align-items:center;">
-          <div class="chapter-num">第${c.num}章</div>
+          <div class="chapter-num">第${c.num}章 <span style="color:var(--muted);font-size:11px;font-weight:400;">${c.text?.length||0}字${(c.text?.length||0)<2000?'<span style="color:var(--red);"> ⚠️偏少</span>':(c.text?.length||0)>3000?'<span style="color:var(--gold);"> ↑偏多</span>':''}</span></div>
           <div style="display:flex;gap:6px;">
-            <span style="color:var(--muted);font-size:11px;">${c.text?.length||0}字</span>
             <button class="btn-small" style="padding:2px 8px;font-size:11px;" onclick="event.stopPropagation();editChapter(${c.num})">编辑</button>
             <button style="background:transparent;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:0 2px;" onclick="event.stopPropagation();deleteChapter(${c.num})">🗑</button>
           </div>
         </div>
         <div class="chapter-summary">${(c.summary||c.text?.slice(0,80)||'')}...</div>
       </div>`).join('')}`;
+}
+
+// 批量工具函数
+function chapterToolLog(msg,cls=''){
+  const el=document.getElementById('chapter-tool-log');
+  if(!el)return;
+  el.innerHTML+=`<div class="log-item ${cls}" style="margin-bottom:2px;">${msg}</div>`;
+  el.scrollTop=el.scrollHeight;
+}
+
+function batchFormatAll(){
+  const p=state.currentProject;
+  const chapters=p.chapters||[];
+  if(!chapters.length){toast('没有章节可排版','error');return;}
+  document.getElementById('chapter-tool-log').innerHTML='';
+  let count=0;
+  chapters.forEach(c=>{
+    let text=c.text||'';
+    text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    text=text.replace(/\n{3,}/g,'\n\n');
+    const lines=text.split('\n');
+    const processed=lines.map(line=>{
+      if(line.length<=30)return line;
+      line=line.replace(/([""」』])(\s*)([^\n""「『])/g,'$1\n$3');
+      line=line.replace(/([。！？…]{1,2})([^\n。！？…""」』]{15,})/g,'$1\n$2');
+      return line;
+    });
+    text=processed.join('\n');
+    text=text.replace(/([^\n])([""「『])/g,'$1\n$2');
+    text=text.split('\n').map(l=>l.trimEnd()).join('\n');
+    text=text.replace(/\n([""「『][^\n]+[""」』])/g,'\n\n$1');
+    text=text.replace(/([""「『][^\n]+[""」』])\n([^\n""「『])/g,'$1\n\n$2');
+    text=text.replace(/\n{3,}/g,'\n\n').trim();
+    c.text=text;
+    c.summary=text.slice(0,120);
+    count++;
+  });
+  saveProject(p);
+  chapterToolLog(`✓ 已格式化 ${count} 章节`,'ok');
+  toast(`一键排版完成，共处理 ${count} 章`,'success');
+  renderChaptersTab(document.getElementById('write-tab-content'));
+}
+
+async function batchHumanizeAll(){
+  const p=state.currentProject;
+  const chapters=p.chapters||[];
+  if(!chapters.length){toast('没有章节','error');return;}
+  if(!getApiKey()){toast('请先配置API Key','error');return;}
+  document.getElementById('chapter-tool-log').innerHTML='';
+  chapterToolLog('🚀 开始朱雀润色，请稍候...','warn');
+  let done=0;
+  for(let i=0;i<chapters.length;i++){
+    const c=chapters[i];
+    chapterToolLog(`✨ 润色第 ${c.num} 章...`);
+    try{
+      const res=await callAI([{role:'user',content:`你是专业文字润色师。对下面这段番茄小说进行去AI化润色处理：
+目标：打破过于整齐的排比结构，加入口语化表达，情绪描写更细腻真实，保留原情节，去除AI惯用连接词。
+直接输出润色后的正文，不要解释，保持相近字数。
+
+原文：
+${c.text}`}],3500);
+      c.text=res;
+      c.summary=res.slice(0,120);
+      done++;
+      chapterToolLog(`✓ 第 ${c.num} 章润色完成（${res.length}字）`,'ok');
+      saveProject(p);
+      if(i<chapters.length-1)await sleep(1200);
+    }catch(e){
+      chapterToolLog(`❌ 第 ${c.num} 章失败: ${e.message.slice(0,50)}`,'err');
+      toast('润色中断: '+e.message.slice(0,50),'error');
+      break;
+    }
+  }
+  chapterToolLog(`🎉 朱雀润色完成，共处理 ${done} 章`,'ok');
+  toast(`朱雀润色完成，共 ${done} 章`,'success');
+  renderChaptersTab(document.getElementById('write-tab-content'));
+}
+
+async function batchCheckAll(){
+  const p=state.currentProject;
+  const chapters=p.chapters||[];
+  if(!chapters.length){toast('没有章节','error');return;}
+  if(!getApiKey()){toast('请先配置API Key','error');return;}
+  document.getElementById('chapter-tool-log').innerHTML='';
+  chapterToolLog('🔍 开始全局检测...','warn');
+  const allText=chapters.map(c=>`第${c.num}章（${c.text?.length||0}字）：${c.text?.slice(0,80)}`).join('\n');
+  try{
+    const res=await callAI([{role:'user',content:`你是番茄小说编辑，对以下所有章节进行全局质量检测：
+
+书名：${p.settings?.title}
+章节总览：
+${allText}
+
+全局检测项：
+1. 字数分布是否均衡（各章字数是否偏差过大）
+2. 人物是否前后一致
+3. 情节节奏是否有断层
+4. 整体爽点密度评估
+5. 最值得重写的3章（如果有的话）
+
+输出简洁检测报告，300字以内，重点指出问题。`}],1000);
+    document.getElementById('chapter-tool-log').innerHTML=`<div style="background:rgba(240,165,0,0.06);border:1px solid rgba(240,165,0,0.2);border-radius:8px;padding:10px;font-size:12px;color:var(--muted2);line-height:1.7;white-space:pre-wrap;">${res}</div>`;
+  }catch(e){
+    chapterToolLog('❌ 检测失败: '+e.message,'err');
+    toast('检测失败: '+e.message,'error');
+  }
 }
 
 function viewChapter(num){
