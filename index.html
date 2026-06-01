@@ -1096,8 +1096,19 @@ function renderOutlineStep(el){
     <div class="step-desc">AI根据设定和字数规划，生成最适合的章节架构</div>
     <button class="btn-primary" onclick="generateOutline()">🗂️ 生成大纲</button>
     <div id="outline-area" style="margin-top:12px;">
-      ${p.outline?`<textarea class="textarea" id="outline-text" style="min-height:400px;">${p.outline}</textarea>
-      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:12px;">确认大纲，规划字数 →</button>`:''}
+      ${p.outline?`
+      <div style="color:var(--muted2);font-size:12px;margin-bottom:10px;">大纲已生成，向下滚动可查看全部内容。</div>
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
+        <div onclick="var d=document.getElementById('ol-pre');d.style.display=d.style.display==='none'?'block':'none'" style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer;background:var(--bg2);">
+          <span style="color:var(--gold);font-size:13px;font-weight:700;">📋 完整大纲（点击折叠/展开）</span>
+          <span style="color:var(--muted);">▼</span>
+        </div>
+        <div id="ol-pre" style="padding:12px 14px;max-height:60vh;overflow-y:auto;">
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${p.outline.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+        </div>
+      </div>
+      <textarea id="outline-text" style="display:none;">${p.outline.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      <button class="btn-primary" onclick="confirmOutline()">确认大纲，规划字数 →</button>`:''}
     </div>`;
 }
 
@@ -1219,15 +1230,50 @@ ${'═'.repeat(30)}
 ${part3}`;
     state.currentProject.outline=fullOutline;
 
+    // 把大纲按分隔符拆成三段，分别展示可折叠块
+    const sections=[
+      {title:'📋 总体架构 & 前五章详情',content:part1},
+      {title:'📖 分卷大纲（前半）',content:part2},
+      {title:'📖 分卷大纲（后半）',content:part3},
+    ];
+    const sectionHtml=sections.map((s,i)=>`
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
+        <div onclick="toggleOutlineSection(${i})" style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer;background:var(--bg2);">
+          <span style="color:var(--gold);font-size:13px;font-weight:700;">${s.title}</span>
+          <span id="outline-arrow-${i}" style="color:var(--muted);font-size:14px;">▼</span>
+        </div>
+        <div id="outline-sec-${i}" style="padding:12px 14px;display:block;">
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${s.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+        </div>
+      </div>`).join('');
     outlineArea.innerHTML=`
-      <textarea class="textarea" id="outline-text" style="min-height:500px;">${fullOutline}</textarea>
-      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:12px;">确认大纲，规划字数 →</button>`;
+      <div style="color:var(--muted2);font-size:12px;margin-bottom:10px;">共三部分，点击标题可折叠。确认后可进入下一步。</div>
+      ${sectionHtml}
+      <textarea id="outline-text" style="display:none;">${fullOutline.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:4px;">确认大纲，规划字数 →</button>`;
   }catch(e){toast('生成失败: '+e.message,'error');}
   btn.textContent='🗂️ 重新生成大纲';btn.disabled=false;
 }
 
+function toggleOutlineSection(i){
+  const sec=document.getElementById('outline-sec-'+i);
+  const arrow=document.getElementById('outline-arrow-'+i);
+  if(!sec)return;
+  const isOpen=sec.style.display!=='none';
+  sec.style.display=isOpen?'none':'block';
+  if(arrow)arrow.textContent=isOpen?'▶':'▼';
+}
+
 function confirmOutline(){
-  const outline=document.getElementById('outline-text').value;
+  const ta=document.getElementById('outline-text');
+  // 从 pre 标签重新拼合完整大纲
+  let outline='';
+  if(ta&&ta.value){
+    outline=ta.value.replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+  } else {
+    const pres=document.querySelectorAll('#outline-area pre');
+    outline=Array.from(pres).map(p=>p.innerText).join('\n\n══════════════════════════════\n\n');
+  }
   advanceStep({outline});
 }
 
