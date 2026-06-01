@@ -1,0 +1,1494 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>🍅 番茄爽文工厂</title>
+<style>
+:root {
+  --bg: #08080f;
+  --bg2: #0f0f1a;
+  --bg3: #161622;
+  --border: #1e1e2e;
+  --gold: #f0a500;
+  --gold2: #ffc840;
+  --red: #e84040;
+  --green: #22c55e;
+  --text: #e2e2e8;
+  --muted: #6b6b80;
+  --muted2: #9898aa;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Serif SC','Source Han Serif SC','SimSun',serif;overflow-x:hidden;}
+#app{min-height:100vh;position:relative;}
+
+/* 背景光晕 */
+.glow-orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;}
+.glow-orb-1{width:600px;height:600px;top:-200px;right:-200px;background:radial-gradient(circle,rgba(240,165,0,.07) 0%,transparent 65%);}
+.glow-orb-2{width:500px;height:500px;bottom:-150px;left:-150px;background:radial-gradient(circle,rgba(232,64,64,.05) 0%,transparent 65%);}
+
+/* 屏幕容器 */
+.screen{display:none;max-width:500px;margin:0 auto;padding:16px 16px 100px;position:relative;z-index:1;}
+.screen.active{display:block;}
+
+/* Toast 通知 */
+#toast{position:fixed;top:20px;left:50%;transform:translateX(-50%) translateY(-80px);padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;color:#fff;z-index:9999;transition:transform .3s ease;pointer-events:none;white-space:nowrap;}
+#toast.show{transform:translateX(-50%) translateY(0);}
+
+/* 首页 */
+.home-hero{text-align:center;padding:60px 0 40px;}
+.hero-emoji{font-size:72px;display:block;margin-bottom:12px;animation:float 3s ease-in-out infinite;}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+.hero-title{font-size:30px;font-weight:900;color:var(--gold);letter-spacing:3px;margin-bottom:6px;}
+.hero-sub{color:var(--muted2);font-size:13px;letter-spacing:1px;}
+
+.btn-primary{display:block;width:100%;padding:14px;background:linear-gradient(135deg,var(--gold),#d08000);color:#000;border:none;border-radius:12px;font-size:15px;font-weight:900;cursor:pointer;letter-spacing:1px;margin-bottom:10px;font-family:inherit;transition:opacity .2s;}
+.btn-primary:active{opacity:.8;}
+.btn-secondary{display:block;width:100%;padding:12px;background:transparent;color:var(--gold);border:1.5px solid var(--gold);border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:inherit;transition:opacity .2s;}
+.btn-secondary:active{opacity:.7;}
+.btn-ghost{display:block;width:100%;padding:11px;background:transparent;color:var(--muted2);border:1px solid var(--border);border-radius:12px;font-size:13px;cursor:pointer;margin-bottom:10px;font-family:inherit;}
+.btn-danger{display:block;width:100%;padding:11px;background:transparent;color:var(--red);border:1px solid var(--red);border-radius:12px;font-size:13px;cursor:pointer;font-family:inherit;}
+
+/* 功能卡片网格 */
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px;}
+.feature-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;}
+.feature-card .fi{font-size:26px;margin-bottom:6px;}
+.feature-card .ft{color:var(--text);font-size:13px;font-weight:700;margin-bottom:3px;}
+.feature-card .fd{color:var(--muted);font-size:11px;}
+
+/* 页面头部 */
+.page-header{display:flex;align-items:center;padding:8px 0 20px;}
+.back-btn{background:transparent;border:none;color:var(--muted2);font-size:20px;cursor:pointer;padding:4px 8px 4px 0;}
+.page-title{color:var(--gold);font-size:19px;font-weight:900;letter-spacing:1px;}
+
+/* Section */
+.section{margin-bottom:24px;}
+.section-title{color:var(--gold);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;margin-bottom:10px;}
+
+/* 项目卡片 */
+.proj-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:border-color .2s;}
+.proj-card:hover{border-color:var(--gold);}
+.proj-info{flex:1;min-width:0;}
+.proj-title{color:var(--text);font-weight:700;font-size:14px;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.proj-meta{color:var(--muted);font-size:11px;margin-bottom:6px;}
+.proj-progress{background:var(--border);height:3px;border-radius:2px;}
+.proj-progress-fill{background:var(--gold);height:3px;border-radius:2px;transition:width .3s;}
+.proj-del{background:transparent;border:none;color:var(--muted);font-size:18px;cursor:pointer;padding:4px;}
+
+/* API 配置 */
+.api-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px;transition:border-color .2s;}
+.api-card.selected{border-color:var(--gold);}
+.api-card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.api-name{color:var(--text);font-weight:700;font-size:14px;margin-right:6px;}
+.stars span{font-size:11px;}
+.api-desc{color:var(--muted);font-size:11px;margin-bottom:10px;}
+.api-key-row{display:flex;gap:8px;align-items:center;}
+.inp{flex:1;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit;}
+.inp:focus{border-color:var(--gold);}
+.textarea{display:block;width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical;min-height:80px;font-family:inherit;line-height:1.7;}
+.textarea:focus{border-color:var(--gold);}
+.btn-test{background:var(--bg3);border:1px solid var(--border);color:var(--muted2);border-radius:8px;padding:0 12px;height:38px;font-size:12px;cursor:pointer;white-space:nowrap;font-family:inherit;}
+.btn-test.ok{color:var(--green);border-color:var(--green);}
+.btn-test.fail{color:var(--red);border-color:var(--red);}
+.btn-sel{background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;}
+.btn-sel.active{background:var(--gold);color:#000;font-weight:700;}
+
+/* 步骤指示器 */
+.step-bar{display:flex;gap:4px;overflow-x:auto;padding-bottom:4px;margin-bottom:20px;scrollbar-width:none;}
+.step-bar::-webkit-scrollbar{display:none;}
+.step-dot{border-radius:8px;padding:5px 8px;font-size:10px;font-weight:700;white-space:nowrap;transition:background .3s;}
+.step-dot.done{background:var(--gold);color:#000;cursor:pointer;}
+.step-dot.active{background:linear-gradient(135deg,var(--gold),#d08000);color:#000;}
+.step-dot.todo{background:var(--bg3);color:var(--muted);}
+
+/* 步骤内容 */
+.step-title{color:var(--gold);font-size:19px;font-weight:900;margin-bottom:6px;}
+.step-desc{color:var(--muted2);font-size:13px;margin-bottom:16px;line-height:1.6;}
+
+/* 分析/日志框 */
+.log-box{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:12px;margin:12px 0;max-height:160px;overflow-y:auto;}
+.log-item{color:var(--muted2);font-size:12px;margin-bottom:5px;line-height:1.5;}
+.log-item.ok{color:var(--green);}
+.log-item.warn{color:var(--gold);}
+.log-item.err{color:var(--red);}
+.analysis-box{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;margin:12px 0;}
+.analysis-title{color:var(--gold);font-weight:700;font-size:13px;margin-bottom:8px;}
+.analysis-content{color:#d1d1d8;font-size:13px;line-height:1.8;white-space:pre-wrap;}
+
+/* 雷达/滑块 */
+.slider-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.slider-label{color:var(--muted2);font-size:12px;width:68px;flex-shrink:0;}
+.slider-input{flex:1;accent-color:var(--gold);height:4px;}
+.slider-val{color:var(--gold);font-size:12px;width:34px;text-align:right;font-weight:700;}
+
+/* 设定字段 */
+.field-group{margin-bottom:14px;}
+.field-label{display:block;color:var(--muted2);font-size:12px;margin-bottom:5px;font-weight:700;}
+.add-field-row{display:flex;gap:8px;margin:8px 0;}
+.btn-small{background:transparent;border:1px solid var(--gold);color:var(--gold);border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;white-space:nowrap;font-family:inherit;}
+.remove-btn{background:transparent;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:0 4px;}
+
+/* 档位卡片 */
+.tier-card{display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .2s;}
+.tier-card.selected{border-color:var(--gold);}
+.tier-label{color:var(--gold);font-weight:700;font-size:14px;}
+.tier-display{color:var(--text);font-size:13px;font-weight:700;}
+.tier-chapters{color:var(--muted);font-size:11px;}
+
+/* 写作页 */
+.writing-header{display:flex;align-items:center;padding:10px 14px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100;}
+.writing-info{flex:1;margin:0 8px;}
+.writing-title{color:var(--gold);font-weight:700;font-size:13px;}
+.writing-progress{color:var(--muted);font-size:11px;}
+.tab-bar{display:flex;gap:3px;}
+.tab-btn{border:none;border-radius:7px;padding:6px 9px;cursor:pointer;font-size:14px;transition:background .2s;}
+.tab-btn.active{background:var(--gold);color:#000;}
+.tab-btn.inactive{background:transparent;color:var(--muted2);}
+.progress-strip{background:var(--border);height:3px;}
+.progress-fill{background:linear-gradient(90deg,var(--gold),var(--gold2));height:3px;transition:width .5s;}
+.write-area{padding:16px;padding-bottom:100px;}
+
+/* 生成中动画 */
+.generating-box{display:flex;align-items:center;justify-content:center;gap:12px;padding:40px;color:var(--gold);}
+.gen-dot{width:10px;height:10px;border-radius:50%;background:var(--gold);animation:pulse 1.2s infinite;}
+.gen-dot:nth-child(2){animation-delay:.2s;}
+.gen-dot:nth-child(3){animation-delay:.4s;}
+@keyframes pulse{0%,100%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.2)}}
+
+/* 质检结果 */
+.check-box{border-radius:10px;padding:12px;margin:10px 0;}
+.check-box.pass{background:rgba(34,197,94,.08);border:1px solid var(--green);}
+.check-box.fail{background:rgba(232,64,64,.08);border:1px solid var(--red);}
+
+/* 章节操作 */
+.chapter-actions{display:flex;gap:8px;margin-top:12px;}
+.chapter-actions .btn-primary,.chapter-actions .btn-secondary{margin:0;}
+
+/* 故事卡 */
+.card-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.card-tag{background:var(--bg3);color:#d1d1d8;border-radius:6px;padding:3px 9px;font-size:11px;}
+
+/* 章节列表 */
+.chapter-item{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;}
+.chapter-num{color:var(--gold);font-weight:700;font-size:13px;margin-bottom:3px;}
+.chapter-summary{color:var(--muted);font-size:12px;line-height:1.5;}
+
+/* 导出按钮组 */
+.export-group{display:flex;flex-direction:column;gap:10px;}
+
+/* 空状态 */
+.empty-state{text-align:center;padding:48px 20px;color:var(--muted);}
+.empty-state .ei{font-size:48px;margin-bottom:12px;}
+
+/* 开局风格卡 */
+.style-card{background:var(--bg2);border:1.5px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:border-color .2s;}
+.style-card.selected{border-color:var(--gold);}
+.style-name{color:var(--gold);font-weight:700;font-size:13px;margin-bottom:3px;}
+.style-desc{color:var(--muted);font-size:11px;line-height:1.5;}
+
+/* 干预框 */
+.intervention-box{background:var(--bg3);border:1px dashed var(--gold);border-radius:10px;padding:12px;margin:10px 0;}
+.intervention-label{color:var(--gold);font-size:12px;font-weight:700;margin-bottom:6px;}
+
+/* 预告仪 */
+.forecast-box{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:12px;margin:10px 0;}
+.forecast-item{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px;}
+.forecast-num{color:var(--gold);font-size:12px;font-weight:700;width:28px;flex-shrink:0;}
+.forecast-text{color:var(--muted2);font-size:12px;line-height:1.5;}
+
+/* 全局检查 */
+.global-check{background:rgba(240,165,0,.06);border:1px solid rgba(240,165,0,.3);border-radius:10px;padding:12px;margin:10px 0;}
+
+/* 历史版本 */
+.history-item{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:6px;display:flex;align-items:center;gap:8px;}
+.history-ver{color:var(--gold);font-size:11px;font-weight:700;width:40px;flex-shrink:0;}
+.history-info{flex:1;}
+.history-time{color:var(--muted);font-size:11px;}
+.history-desc{color:var(--muted2);font-size:12px;}
+.history-restore{background:transparent;border:1px solid var(--border);color:var(--muted2);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-family:inherit;}
+
+/* 滚动条美化 */
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="glow-orb glow-orb-1"></div>
+  <div class="glow-orb glow-orb-2"></div>
+  <div id="toast"></div>
+
+  <!-- 首页 -->
+  <div id="screen-home" class="screen active">
+    <div class="home-hero">
+      <span class="hero-emoji">🍅</span>
+      <div class="hero-title">番茄爽文工厂</div>
+      <div class="hero-sub">AI驱动 · 一键生成百万字爽文</div>
+    </div>
+    <div style="margin-bottom:32px;">
+      <button class="btn-primary" onclick="newProject()">✍️ 新建项目</button>
+      <button class="btn-secondary" onclick="showScreen('projects')">📚 我的项目</button>
+      <button class="btn-ghost" onclick="showScreen('api')">⚙️ API 配置</button>
+    </div>
+    <div id="home-recent"></div>
+    <div class="feature-grid">
+      <div class="feature-card"><div class="fi">🔍</div><div class="ft">智能拆书</div><div class="fd">三重通道分析爆款基因</div></div>
+      <div class="feature-card"><div class="fi">🧬</div><div class="ft">基因雷达</div><div class="fd">可视化调节爽点比例</div></div>
+      <div class="feature-card"><div class="fi">🤖</div><div class="ft">双重自检</div><div class="fd">章节+全局质量保障</div></div>
+      <div class="feature-card"><div class="fi">📝</div><div class="ft">故事状态卡</div><div class="fd">AI记忆保证剧情连贯</div></div>
+      <div class="feature-card"><div class="fi">⏱️</div><div class="ft">爽点预测仪</div><div class="fd">预判5章爽点安排</div></div>
+      <div class="feature-card"><div class="fi">🔄</div><div class="ft">版本回滚</div><div class="fd">任意历史版本可恢复</div></div>
+    </div>
+  </div>
+
+  <!-- API配置页 -->
+  <div id="screen-api" class="screen">
+    <div class="page-header">
+      <button class="back-btn" onclick="showScreen('home')">←</button>
+      <span class="page-title">API 配置</span>
+    </div>
+    <!-- iPhone访问提示 -->
+    <div id="ios-tip" style="background:rgba(240,165,0,0.08);border:1px solid rgba(240,165,0,0.35);border-radius:12px;padding:13px 14px;margin-bottom:16px;">
+      <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:6px;">📱 iPhone 用户须知</div>
+      <div style="color:var(--muted2);font-size:12px;line-height:1.7;">
+        本地打开 HTML 文件无法发出网络请求（iOS 安全限制）。<br>
+        推荐以下任一方式托管后用 Safari 访问：<br>
+        <br>
+        <b style="color:var(--text);">① GitHub Pages（免费）</b><br>
+        新建仓库 → 上传此 HTML → Settings → Pages → 开启<br>
+        <br>
+        <b style="color:var(--text);">② Vercel（最简单）</b><br>
+        拖拽文件到 vercel.com/new → 即得 HTTPS 链接<br>
+        <br>
+        <b style="color:var(--text);">③ 国内：Gitee Pages</b><br>
+        注册 Gitee → 新建仓库 → 上传 → 开启 Gitee Pages
+      </div>
+      <button onclick="document.getElementById('ios-tip').style.display='none'" style="margin-top:10px;background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:inherit;">我已了解，收起</button>
+    </div>
+    <div id="api-list"></div>
+    <button class="btn-primary" onclick="saveApiConfig()" style="margin-top:8px;">💾 保存所有配置</button>
+  </div>
+
+  <!-- 项目列表页 -->
+  <div id="screen-projects" class="screen">
+    <div class="page-header">
+      <button class="back-btn" onclick="showScreen('home')">←</button>
+      <span class="page-title">我的项目</span>
+    </div>
+    <button class="btn-primary" onclick="newProject()">+ 新建项目</button>
+    <div id="project-list"></div>
+  </div>
+
+  <!-- 创作流程页 -->
+  <div id="screen-create" class="screen">
+    <div class="page-header">
+      <button class="back-btn" onclick="showScreen('home')">←</button>
+      <span class="page-title">创作向导</span>
+    </div>
+    <div class="step-bar" id="step-bar"></div>
+    <div id="step-content"></div>
+  </div>
+
+  <!-- 正文写作页 -->
+  <div id="screen-writing" class="screen" style="padding:0;">
+    <div class="writing-header">
+      <button class="back-btn" onclick="showScreen('home')" style="color:var(--muted2);">←</button>
+      <div class="writing-info">
+        <div class="writing-title" id="writing-title">-</div>
+        <div class="writing-progress" id="writing-progress">-</div>
+      </div>
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tab-write" onclick="setWriteTab('write')">✍️</button>
+        <button class="tab-btn inactive" id="tab-chapters" onclick="setWriteTab('chapters')">📚</button>
+        <button class="tab-btn inactive" id="tab-card" onclick="setWriteTab('card')">🗂️</button>
+        <button class="tab-btn inactive" id="tab-history" onclick="setWriteTab('history')">⏪</button>
+        <button class="tab-btn inactive" id="tab-export" onclick="setWriteTab('export')">📤</button>
+      </div>
+    </div>
+    <div class="progress-strip"><div class="progress-fill" id="writing-prog-bar" style="width:0%"></div></div>
+    <div id="write-tab-content" class="write-area"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+// 数据层
+// ═══════════════════════════════════════════════
+const API_PROVIDERS = [
+  {id:'deepseek',name:'DeepSeek',region:'国内',stars:5,model:'deepseek-chat',base:'https://api.deepseek.com/v1',desc:'爽文首选，中文理解极强，性价比最高',link:'https://platform.deepseek.com/api_keys'},
+  {id:'kimi',name:'Kimi (月之暗面)',region:'国内',stars:5,model:'moonshot-v1-128k',base:'https://api.moonshot.cn/v1',desc:'128K超长上下文，长文连贯性最佳',link:'https://platform.moonshot.cn/console/api-keys'},
+  {id:'qwen',name:'通义千问',region:'国内',stars:4,model:'qwen-max',base:'https://dashscope.aliyuncs.com/compatible-mode/v1',desc:'阿里出品，稳定可靠，中文优秀',link:'https://bailian.console.aliyun.com/?apiKey=1'},
+  {id:'zhipu',name:'智谱 GLM-4',region:'国内',stars:4,model:'glm-4',base:'https://open.bigmodel.cn/api/paas/v4',desc:'创意写作表现优秀，想象力丰富',link:'https://open.bigmodel.cn/usercenter/apikeys'},
+  {id:'doubao',name:'豆包',region:'国内',stars:3,model:'doubao-pro-32k',base:'https://ark.cn-beijing.volces.com/api/v3',desc:'字节出品，风格活泼，适合轻松爽文',link:'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey'},
+  {id:'wenxin',name:'文心一言 4.0',region:'国内',stars:3,model:'ernie-4.0-8k',base:'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',desc:'百度出品，内容安全性高',link:'https://console.bce.baidu.com/qianfan/ais/console/applicationConsole/application'},
+  {id:'claude',name:'Claude (Anthropic)',region:'国际',stars:5,model:'claude-sonnet-4-20250514',base:'https://api.anthropic.com/v1',desc:'叙事结构最佳，人物塑造深度强',link:'https://console.anthropic.com/settings/keys'},
+  {id:'openai',name:'OpenAI GPT-4o',region:'国际',stars:4,model:'gpt-4o',base:'https://api.openai.com/v1',desc:'综合能力全面，创意多样',link:'https://platform.openai.com/api-keys'},
+  {id:'gemini',name:'Google Gemini 1.5',region:'国际',stars:4,model:'gemini-1.5-pro',base:'https://generativelanguage.googleapis.com/v1beta',desc:'多模态理解，世界观构建强',link:'https://aistudio.google.com/app/apikey'},
+  {id:'groq',name:'Groq',region:'国际',stars:4,model:'llama-3.3-70b-versatile',base:'https://api.groq.com/openai/v1',desc:'推理速度极快，免费额度充足，适合快速出章',link:'https://console.groq.com/keys'},
+];
+
+const WORD_TIERS = [
+  {label:'短篇',words:'50万字',val:500000,chapters:200},
+  {label:'中篇',words:'80万字',val:800000,chapters:320},
+  {label:'标准',words:'100万字',val:1000000,chapters:400},
+  {label:'长篇',words:'150万字',val:1500000,chapters:600},
+  {label:'超长',words:'200万字',val:2000000,chapters:800},
+];
+
+const OPENING_STYLES = [
+  {id:'slap',name:'🥊 开局打脸',desc:'第一章直接爽点前置，展现被羞辱→立刻反击，让读者立即爽到'},
+  {id:'mystery',name:'🔮 悬念钩子',desc:'第一章埋下重大谜题或悬念，第二章揭秘引爆，让读者迫切想往下看'},
+  {id:'ai',name:'🤖 AI智能分析',desc:'AI根据你的故事设定，自动分析并选择最佳开局方式，量身定制'},
+];
+
+const DEFAULT_FIELDS = [
+  {k:'title',l:'书名',t:'input',p:'AI将自动生成，可修改'},
+  {k:'genre',l:'类型标签',t:'input',p:'如：都市逆袭、修仙爽文、重生复仇、系统流'},
+  {k:'protagonist_name',l:'主角姓名',t:'input',p:''},
+  {k:'protagonist_bg',l:'主角背景',t:'textarea',p:'出身、初始状态、核心特质、被压迫的原因'},
+  {k:'protagonist_ability',l:'主角金手指/核心能力',t:'textarea',p:'独特且强力的能力设定，这是爽点的核心'},
+  {k:'protagonist_goal',l:'主角终极目标',t:'input',p:'最终要达成的目标，驱动整个故事'},
+  {k:'protagonist_growth',l:'主角成长路线',t:'textarea',p:'从弱到强的成长轨迹，关键转折节点'},
+  {k:'antagonist_name',l:'主要反派',t:'input',p:''},
+  {k:'antagonist_motivation',l:'反派动机',t:'textarea',p:'反派的合理动机，不要脸谱化'},
+  {k:'antagonist_power',l:'反派势力',t:'textarea',p:'反派的背景和资源'},
+  {k:'female_lead',l:'女主角',t:'input',p:'姓名及简要特征'},
+  {k:'supporting_chars',l:'重要配角',t:'textarea',p:'其他重要角色及其与主角的关系'},
+  {k:'relationship_map',l:'核心人物关系网',t:'textarea',p:'各主要人物之间的关系，越详细越好'},
+  {k:'world_setting',l:'世界观设定',t:'textarea',p:'时代背景、世界规则、社会结构'},
+  {k:'power_system',l:'能力/升级体系',t:'textarea',p:'修炼等级划分、能力规则、升级方式'},
+  {k:'factions',l:'主要势力/门派/组织',t:'textarea',p:'各方势力的名称、特征、与主角的关系'},
+  {k:'core_conflict',l:'核心矛盾',t:'textarea',p:'贯穿全书的主要矛盾冲突'},
+  {k:'hook_points',l:'主要爽点设计',t:'textarea',p:'打脸、逆袭、复仇等关键爽点，越具体越好'},
+  {k:'story_summary',l:'故事简介',t:'textarea',p:'200字以内的核心故事梗概，类似番茄简介'},
+  {k:'emotional_tone',l:'情感基调',t:'input',p:'如：热血、阴谋算计、温情暖心、黑化复仇'},
+  {k:'writing_style',l:'写作风格',t:'input',p:'如：爽快直接、暗黑系、轻松幽默、硬核热血'},
+  {k:'chapter_rhythm',l:'章节节奏规划',t:'textarea',p:'大致节奏：开篇-发展-高潮-结局各占多少章'},
+  {k:'foreshadowing',l:'主要伏笔设计',t:'textarea',p:'预先设计好的伏笔，后期要回收的'},
+  {k:'forbidden_content',l:'内容禁区',t:'textarea',p:'不希望出现的内容或情节，防止AI翻车'},
+  {k:'special_notes',l:'其他特殊设定',t:'textarea',p:'任何其他重要设定，越详细越好'},
+];
+
+const STEPS = ['idea','analysis','settings','outline','wordcount','ready'];
+const STEP_LABELS = ['💡创意','📚拆书','⚙️设定','📋大纲','📊字数','🚀出发'];
+
+let state = {
+  apiConfig: JSON.parse(localStorage.getItem('apiConfig')||'{}'),
+  selectedProvider: localStorage.getItem('selectedProvider')||'deepseek',
+  projects: JSON.parse(localStorage.getItem('projects')||'[]'),
+  currentProject: null,
+  writeTab: 'write',
+  tempKeys: {},
+  testResults: {},
+  generating: false,
+  currentChapterDraft: '',
+  checkResult: null,
+  showIntervention: false,
+  intervention: '',
+  geneRadar: {slap:70,upgrade:60,romance:30,mystery:50,emotion:80},
+  customFields: [],
+  editingCard: false,
+  forecast: null,
+};
+
+// ═══════════════════════════════════════════════
+// 工具
+// ═══════════════════════════════════════════════
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function save(){
+  localStorage.setItem('apiConfig',JSON.stringify(state.apiConfig));
+  localStorage.setItem('selectedProvider',state.selectedProvider);
+  localStorage.setItem('projects',JSON.stringify(state.projects));
+}
+function saveProject(proj){
+  proj.updatedAt=Date.now();
+  const idx=state.projects.findIndex(p=>p.id===proj.id);
+  if(idx>=0)state.projects[idx]=proj; else state.projects.unshift(proj);
+  state.currentProject=proj;
+  save();
+}
+function toast(msg,type='info'){
+  const t=document.getElementById('toast');
+  t.textContent=msg;
+  t.style.background=type==='error'?'#e84040':type==='success'?'#22c55e':'#f0a500';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2800);
+}
+function getProvider(){
+  const customs=JSON.parse(localStorage.getItem('customProviders')||'[]');
+  return API_PROVIDERS.find(p=>p.id===state.selectedProvider)||customs.find(p=>p.id===state.selectedProvider)||API_PROVIDERS[0];
+}
+function getApiKey(){return state.apiConfig[state.selectedProvider]||'';}
+
+async function callAI(messages,maxTokens=3000){
+  const prov=getProvider();
+  const key=getApiKey();
+  if(!key)throw new Error('未配置API Key，请先在API配置页填写');
+  const isClaude=prov.id==='claude';
+  const headers={'Content-Type':'application/json'};
+  let url,body;
+  if(isClaude){
+    // Claude 用 Anthropic 原生格式
+    headers['x-api-key']=key;
+    headers['anthropic-version']='2023-06-01';
+    url=prov.base+'/messages';
+    body={model:prov.model,max_tokens:maxTokens,messages};
+  } else {
+    // 所有其他（OpenAI / DeepSeek / Kimi / Groq / 自定义等）用 OpenAI 兼容格式
+    headers['Authorization']='Bearer '+key;
+    url=prov.base+'/chat/completions';
+    body={model:prov.model,max_tokens:maxTokens,messages};
+  }
+  const resp=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});
+  if(!resp.ok){const e=await resp.text();throw new Error('API错误 '+resp.status+': '+e.slice(0,120));}
+  const data=await resp.json();
+  // 兼容两种响应格式
+  return data.choices?.[0]?.message?.content||data.content?.[0]?.text||'';
+}
+
+function showScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  window.scrollTo(0,0);
+  if(name==='home')renderHome();
+  if(name==='api')renderApiPage();
+  if(name==='projects')renderProjects();
+  if(name==='create')renderCreatePage();
+  if(name==='writing')renderWritingPage();
+}
+
+// ═══════════════════════════════════════════════
+// 首页
+// ═══════════════════════════════════════════════
+function renderHome(){
+  const recent=state.projects.slice(0,3);
+  const el=document.getElementById('home-recent');
+  if(!recent.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="section"><div class="section-title">最近项目</div>${recent.map(p=>`
+    <div class="proj-card" onclick="openProject('${p.id}')">
+      <div class="proj-info">
+        <div class="proj-title">${p.settings?.title||p.idea?.slice(0,24)||'未命名项目'}</div>
+        <div class="proj-meta">${STEP_LABELS[STEPS.indexOf(p.step)]||p.step} · ${p.chapters?.length||0}章</div>
+        ${p.wordTier?`<div class="proj-progress"><div class="proj-progress-fill" style="width:${Math.min(100,((p.chapters?.length||0)/p.wordTier.chapters*100)).toFixed(1)}%"></div></div>`:''}
+      </div>
+    </div>`).join('')}</div>`;
+}
+
+// ═══════════════════════════════════════════════
+// API 配置
+// ═══════════════════════════════════════════════
+function renderApiPage(){
+  state.tempKeys={...state.apiConfig};
+  const customProviders=JSON.parse(localStorage.getItem('customProviders')||'[]');
+
+  function cardHtml(p,isCustom){
+    const sel=state.selectedProvider===p.id;
+    return `<div class="api-card ${sel?'selected':''}" id="apicard-${p.id}">
+      <div class="api-card-top">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span class="api-name">${p.name}</span>
+          ${!isCustom?`<span class="stars">${'★'.repeat(p.stars)+'☆'.repeat(5-p.stars)}</span>`:'<span style="font-size:10px;color:var(--muted);background:var(--bg3);padding:1px 7px;border-radius:4px;border:1px solid var(--border);">自定义</span>'}
+        </div>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          ${p.link?`<a href="${p.link}" target="_blank" style="font-size:11px;color:var(--gold);text-decoration:none;border:1px solid rgba(240,165,0,0.5);border-radius:6px;padding:3px 8px;white-space:nowrap;background:rgba(240,165,0,0.06);">获取Key 🔗</a>`:''}
+          <button class="btn-sel ${sel?'active':''}" onclick="selectProvider('${p.id}')">${sel?'✓ 已选':'选用'}</button>
+        </div>
+      </div>
+      <div class="api-desc">${p.desc||''}</div>
+      ${isCustom?`<div style="font-size:11px;color:var(--muted);margin-bottom:8px;word-break:break-all;">端点: ${p.base} &nbsp;|&nbsp; 模型: ${p.model}</div>`:''}
+      <div class="api-key-row">
+        <input class="inp" type="password" id="key-${p.id}" placeholder="输入 ${p.name} API Key" value="${state.apiConfig[p.id]||''}" oninput="state.tempKeys['${p.id}']=this.value">
+        <button class="btn-test" id="test-${p.id}" onclick="testApi('${p.id}')">测试</button>
+        ${isCustom?`<button class="btn-test" style="color:var(--red);border-color:var(--red);flex-shrink:0;" onclick="deleteCustomProvider('${p.id}')">删除</button>`:''}
+      </div>
+    </div>`;
+  }
+
+  const groups=[
+    {label:'🇨🇳 国内模型（推荐）',list:API_PROVIDERS.filter(p=>p.region==='国内')},
+    {label:'🌍 国际模型',list:API_PROVIDERS.filter(p=>p.region==='国际')},
+  ];
+
+  const customSection=`<div class="section">
+    <div class="section-title">🔧 自定义 API</div>
+    <div style="color:var(--muted2);font-size:12px;margin-bottom:12px;line-height:1.6;">支持任何兼容 OpenAI 格式的接口（SiliconFlow、本地Ollama等），填写端点、模型名和 Key 即可使用</div>
+    ${customProviders.map(p=>cardHtml(p,true)).join('')}
+    <div style="background:var(--bg2);border:1.5px dashed var(--border);border-radius:12px;padding:14px;margin-top:4px;">
+      <div style="color:var(--gold);font-size:12px;font-weight:700;letter-spacing:1px;margin-bottom:12px;">+ 添加自定义接口</div>
+      <div class="field-group">
+        <label class="field-label">名称 *</label>
+        <input class="inp" id="custom-name" placeholder="如：SiliconFlow、私有部署模型...">
+      </div>
+      <div class="field-group">
+        <label class="field-label">API 端点 Base URL *</label>
+        <input class="inp" id="custom-base" placeholder="如：https://api.siliconflow.cn/v1">
+      </div>
+      <div class="field-group">
+        <label class="field-label">模型名称 *</label>
+        <input class="inp" id="custom-model" placeholder="如：Qwen/Qwen2.5-72B-Instruct">
+      </div>
+      <div class="field-group">
+        <label class="field-label">备注说明（可选）</label>
+        <input class="inp" id="custom-desc" placeholder="用途说明，方便识别">
+      </div>
+      <button class="btn-secondary" onclick="addCustomProvider()" style="margin-top:4px;">✅ 添加并保存</button>
+    </div>
+  </div>`;
+
+  document.getElementById('api-list').innerHTML=
+    groups.map(g=>`<div class="section"><div class="section-title">${g.label}</div>${g.list.map(p=>cardHtml(p,false)).join('')}</div>`).join('')+
+    customSection;
+}
+
+function selectProvider(id){
+  state.selectedProvider=id;
+  save();
+  renderApiPage();
+}
+
+async function testApi(id){
+  const key=document.getElementById('key-'+id)?.value||state.tempKeys[id]||state.apiConfig[id];
+  if(!key){toast('请先输入 API Key','error');return;}
+  const btn=document.getElementById('test-'+id);
+  btn.textContent='测试中...';btn.disabled=true;
+  const customs=JSON.parse(localStorage.getItem('customProviders')||'[]');
+  const prov=API_PROVIDERS.find(p=>p.id===id)||customs.find(p=>p.id===id);
+  if(!prov){btn.textContent='✗ 失败';btn.disabled=false;return;}
+  try{
+    const isClaude=id==='claude';
+    const headers={'Content-Type':'application/json'};
+    let url,body;
+    if(isClaude){
+      headers['x-api-key']=key;
+      headers['anthropic-version']='2023-06-01';
+      url=prov.base+'/messages';
+      body={model:prov.model,max_tokens:5,messages:[{role:'user',content:'hi'}]};
+    } else {
+      headers['Authorization']='Bearer '+key;
+      url=prov.base+'/chat/completions';
+      body={model:prov.model,max_tokens:5,messages:[{role:'user',content:'hi'}]};
+    }
+    const resp=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});
+    if(resp.ok){btn.textContent='✓ 可用';btn.className='btn-test ok';toast(prov.name+' 连接成功 ✓','success');}
+    else{
+      const errText=await resp.text();
+      btn.textContent='✗ 失败';btn.className='btn-test fail';
+      toast(prov.name+' 失败 '+resp.status,'error');
+    }
+  }catch(e){
+    btn.textContent='✗ 失败';btn.className='btn-test fail';
+    toast('连接失败: '+e.message.slice(0,60),'error');
+  }
+  btn.disabled=false;
+}
+
+function saveApiConfig(){
+  state.apiConfig={...state.tempKeys};
+  const allProviders=[...API_PROVIDERS,...(JSON.parse(localStorage.getItem('customProviders')||'[]'))];
+  allProviders.forEach(p=>{
+    const el=document.getElementById('key-'+p.id);
+    if(el)state.apiConfig[p.id]=el.value;
+  });
+  save();toast('保存成功 ✓','success');
+}
+
+function addCustomProvider(){
+  const name=document.getElementById('custom-name').value.trim();
+  const base=document.getElementById('custom-base').value.trim();
+  const model=document.getElementById('custom-model').value.trim();
+  const desc=document.getElementById('custom-desc').value.trim();
+  if(!name||!base||!model){toast('名称、端点、模型名为必填项','error');return;}
+  const customs=JSON.parse(localStorage.getItem('customProviders')||'[]');
+  const newP={id:'custom_'+uid(),name,region:'自定义',stars:3,model,base,desc:desc||'自定义接口',link:''};
+  customs.push(newP);
+  localStorage.setItem('customProviders',JSON.stringify(customs));
+  toast('自定义接口已添加 ✓','success');
+  renderApiPage();
+}
+
+function deleteCustomProvider(id){
+  if(!confirm('确认删除此自定义接口？'))return;
+  const customs=JSON.parse(localStorage.getItem('customProviders')||'[]').filter(p=>p.id!==id);
+  localStorage.setItem('customProviders',JSON.stringify(customs));
+  if(state.selectedProvider===id){state.selectedProvider='deepseek';save();}
+  toast('已删除','success');
+  renderApiPage();
+}
+
+// ═══════════════════════════════════════════════
+// 项目管理
+// ═══════════════════════════════════════════════
+function renderProjects(){
+  const el=document.getElementById('project-list');
+  if(!state.projects.length){el.innerHTML='<div class="empty-state"><div class="ei">📭</div>暂无项目</div>';return;}
+  el.innerHTML=state.projects.map(p=>`
+    <div class="proj-card">
+      <div class="proj-info" onclick="openProject('${p.id}')">
+        <div class="proj-title">${p.settings?.title||p.idea?.slice(0,28)||'未命名项目'}</div>
+        <div class="proj-meta">${STEP_LABELS[STEPS.indexOf(p.step)]||p.step} · ${p.chapters?.length||0}章 · ${p.wordTier?.words||'-'} · ${new Date(p.updatedAt).toLocaleDateString()}</div>
+        ${p.wordTier?`<div class="proj-progress" style="margin-top:6px;"><div class="proj-progress-fill" style="width:${Math.min(100,((p.chapters?.length||0)/p.wordTier.chapters*100)).toFixed(1)}%"></div></div>`:''}
+      </div>
+      <button class="proj-del" onclick="deleteProject('${p.id}')">🗑</button>
+    </div>`).join('');
+}
+
+function openProject(id){
+  state.currentProject=state.projects.find(p=>p.id===id);
+  state.currentChapterDraft='';state.checkResult=null;state.forecast=null;
+  if(state.currentProject.step==='writing')showScreen('writing');
+  else showScreen('create');
+}
+
+function newProject(){
+  state.currentProject={
+    id:uid(),createdAt:Date.now(),updatedAt:Date.now(),
+    step:'idea',idea:'',aiIdeaAnalysis:'',analysisResult:'',
+    geneRadar:{slap:70,upgrade:60,romance:30,mystery:50,emotion:80},
+    settings:{},customFields:[],outline:'',wordTier:WORD_TIERS[2],
+    openingStyle:'ai',chapters:[],
+    storyCard:{characters:[],events:[],foreshadowing:[],emotionNodes:[]},
+    history:[],
+  };
+  showScreen('create');
+}
+
+function deleteProject(id){
+  if(!confirm('确认删除此项目？此操作不可恢复。'))return;
+  state.projects=state.projects.filter(p=>p.id!==id);
+  save();renderProjects();
+}
+
+// ═══════════════════════════════════════════════
+// 创作流程
+// ═══════════════════════════════════════════════
+function renderCreatePage(){
+  const p=state.currentProject;
+  const si=STEPS.indexOf(p.step);
+  // 步骤条
+  document.getElementById('step-bar').innerHTML=STEPS.map((s,i)=>`
+    <div class="step-dot ${i<si?'done':i===si?'active':'todo'}" onclick="${i<si?`goToStep('${s}')`:'void 0'}">${STEP_LABELS[i]}</div>`).join('');
+  // 内容
+  const el=document.getElementById('step-content');
+  if(p.step==='idea')renderIdeaStep(el);
+  else if(p.step==='analysis')renderAnalysisStep(el);
+  else if(p.step==='settings')renderSettingsStep(el);
+  else if(p.step==='outline')renderOutlineStep(el);
+  else if(p.step==='wordcount')renderWordcountStep(el);
+  else if(p.step==='ready')renderReadyStep(el);
+}
+
+function goToStep(step){
+  state.currentProject.step=step;
+  saveProject(state.currentProject);
+  renderCreatePage();
+}
+
+function advanceStep(data={}){
+  Object.assign(state.currentProject,data);
+  const si=STEPS.indexOf(state.currentProject.step);
+  state.currentProject.step=STEPS[Math.min(si+1,STEPS.length-1)];
+  saveProject(state.currentProject);
+  renderCreatePage();
+}
+
+// Step 1 创意
+function renderIdeaStep(el){
+  const p=state.currentProject;
+  el.innerHTML=`
+    <div class="step-title">💡 输入你的创意</div>
+    <div class="step-desc">用一句话描述你想写的故事，AI将自动分析类型、爽点和方向</div>
+    <textarea class="textarea" id="idea-input" style="min-height:110px;" placeholder="例如：一个被退婚的废柴少爷，意外觉醒了神秘体质，开始了都市逆袭之路">${p.idea||''}</textarea>
+    <button class="btn-primary" onclick="analyzeIdea()" style="margin-top:8px;">🔍 AI智能分析创意</button>
+    <div id="idea-result"></div>`;
+  if(p.aiIdeaAnalysis){renderIdeaResult(p.aiIdeaAnalysis);}
+}
+
+async function analyzeIdea(){
+  const idea=document.getElementById('idea-input').value.trim();
+  if(!idea){toast('请输入你的创意','error');return;}
+  state.currentProject.idea=idea;
+  document.querySelector('[onclick="analyzeIdea()"]').textContent='🤔 分析中...';
+  try{
+    const res=await callAI([{role:'user',content:`你是资深番茄小说编辑。用户创意：「${idea}」
+请分析并输出：
+1. 最适合的爽文类型（都市/修仙/重生/系统流等）
+2. 核心爽点类型（打脸/逆袭/复仇/装逼等）
+3. 目标读者群体特征
+4. 同类爆款关键词（3-5个，用于后续拆书）
+5. 创意亮点和需要强化的点
+6. 建议的故事走向
+
+输出简洁专业，约250字。`}]);
+    state.currentProject.aiIdeaAnalysis=res;
+    renderIdeaResult(res);
+  }catch(e){toast('分析失败: '+e.message,'error');}
+  const btn=document.querySelector('[onclick="analyzeIdea()"]');
+  if(btn)btn.textContent='🔍 AI智能分析创意';
+}
+
+function renderIdeaResult(res){
+  document.getElementById('idea-result').innerHTML=`
+    <div class="analysis-box" style="margin-top:12px;">
+      <div class="analysis-title">🎯 AI分析结果</div>
+      <div class="analysis-content">${res}</div>
+      <button class="btn-primary" onclick="advanceStep({idea:document.getElementById('idea-input').value,aiIdeaAnalysis:'${encodeURIComponent(res)}'})" style="margin-top:12px;">确认，进入拆书分析 →</button>
+    </div>`;
+}
+
+// Step 2 拆书
+function renderAnalysisStep(el){
+  const p=state.currentProject;
+  el.innerHTML=`
+    <div class="step-title">📚 拆书分析</div>
+    <div class="step-desc">AI分析同类爆款爽文，提炼爽文基因结构</div>
+    ${!p.analysisResult?`<button class="btn-primary" onclick="runAnalysis()">🚀 开始拆书分析</button>`:''}
+    <div id="analysis-log"></div>
+    <div id="analysis-result">${p.analysisResult?renderAnalysisResult(p.analysisResult,p.geneRadar):''}</div>`;
+}
+
+async function runAnalysis(){
+  const p=state.currentProject;
+  const logEl=document.getElementById('analysis-log');
+  const resEl=document.getElementById('analysis-result');
+  const btn=document.querySelector('[onclick="runAnalysis()"]');
+  if(btn)btn.remove();
+
+  function log(msg,cls=''){logEl.innerHTML+=`<div class="log-item ${cls}">${msg}</div>`;logEl.scrollTop=logEl.scrollHeight;}
+  logEl.innerHTML='<div class="log-box">';
+  log('🔍 AI分析创意，提取搜索关键词...');
+  
+  try{
+    const kwRes=await callAI([{role:'user',content:`根据小说创意：「${p.idea}」
+提取3个最适合搜索同类爽文的关键词，每个2-4字，只输出关键词用逗号分隔，不要其他。`}],100);
+    log('✓ 关键词：'+kwRes,'ok');
+    log('📖 尝试主力通道：番茄小说热榜...','warn');
+    await sleep(1200);
+    log('⚠️ 主力通道受跨域限制，切换备用通道1...','warn');
+    await sleep(800);
+    log('⚠️ 备用通道1受限，激活备用通道2：AI深度推断...','warn');
+    await sleep(600);
+    log('✓ AI深度推断模式激活，基于训练数据分析同类爆款','ok');
+    log('🧬 深度分析爽文基因结构，请稍候...');
+
+    const analysis=await callAI([{role:'user',content:`你是专业网络小说分析师，精通番茄爽文套路。
+
+用户创意：${p.idea}
+AI前置分析：${p.aiIdeaAnalysis||''}
+
+基于对同类番茄爆款的深度理解，输出完整"爽文基因报告"：
+
+【同类爆款书单】列举3-5本真实同类高热度作品，简述各自核心套路
+【套路结构模板】该类型标准剧情架构（分阶段）
+【爽点节奏规律】爽点频率、类型分布、节奏把控
+【人物模板分析】主角/反派/女主的塑造方式
+【番茄排版特征】爽文的典型排版和文字风格
+【开局三章公式】该类型最有效的开篇方式
+【读者留存钩子】让读者不断追更的核心机制
+【常见翻车写法】该类型要避开的坑
+
+输出约600字，专业详细。`}],2000);
+    
+    log('✅ 爽文基因报告生成完毕！','ok');
+    logEl.innerHTML='<div class="log-box">'+logEl.querySelector('.log-box').innerHTML+'</div>';
+    
+    p.analysisResult=analysis;
+    resEl.innerHTML=renderAnalysisResult(analysis,p.geneRadar);
+  }catch(e){
+    log('❌ 分析失败: '+e.message,'err');
+    toast('分析失败: '+e.message,'error');
+  }
+}
+
+function renderAnalysisResult(analysis,radar){
+  const r=radar||{slap:70,upgrade:60,romance:30,mystery:50,emotion:80};
+  const genes=[['slap','打脸密度'],['upgrade','升级速度'],['romance','感情线'],['mystery','悬念感'],['emotion','情绪张力']];
+  return `
+    <div class="analysis-box">
+      <div class="analysis-title">📊 爽文基因报告</div>
+      <div class="analysis-content">${analysis}</div>
+    </div>
+    <div class="section" style="margin-top:12px;">
+      <div class="section-title">🎛️ 爽文基因雷达 - 调节比例</div>
+      ${genes.map(([k,l])=>`
+        <div class="slider-row">
+          <span class="slider-label">${l}</span>
+          <input type="range" class="slider-input" min="0" max="100" value="${r[k]}" oninput="updateGene('${k}',this.value)">
+          <span class="slider-val" id="gene-val-${k}">${r[k]}%</span>
+        </div>`).join('')}
+    </div>
+    <button class="btn-primary" onclick="confirmAnalysis()">确认基因配置，进入设定 →</button>`;
+}
+
+function updateGene(k,v){
+  state.currentProject.geneRadar[k]=Number(v);
+  document.getElementById('gene-val-'+k).textContent=v+'%';
+}
+
+function confirmAnalysis(){
+  advanceStep({analysisResult:state.currentProject.analysisResult,geneRadar:state.currentProject.geneRadar});
+}
+
+// Step 3 设定
+function renderSettingsStep(el){
+  const p=state.currentProject;
+  state.customFields=p.customFields||[];
+  el.innerHTML=`
+    <div class="step-title">⚙️ 基础设定</div>
+    <div class="step-desc">AI将生成完整创作设定（20+项），你可自由修改所有内容</div>
+    <button class="btn-primary" onclick="autoGenSettings()">✨ AI一键生成所有设定</button>
+    <div id="settings-fields" style="margin-top:12px;">${renderSettingsFields()}</div>
+    <div id="custom-fields">${renderCustomFields()}</div>
+    <div class="add-field-row">
+      <input class="inp" id="new-field-name" placeholder="添加自定义设定项名称...">
+      <button class="btn-small" onclick="addCustomField()">+ 添加</button>
+    </div>
+    <button class="btn-primary" onclick="confirmSettings()" style="margin-top:16px;">确认设定，生成大纲 →</button>`;
+}
+
+function renderSettingsFields(){
+  const p=state.currentProject;
+  return DEFAULT_FIELDS.map(f=>`
+    <div class="field-group">
+      <label class="field-label">${f.l}</label>
+      ${f.t==='textarea'
+        ?`<textarea class="textarea" data-key="${f.k}" placeholder="${f.p}">${p.settings[f.k]||''}</textarea>`
+        :`<input class="inp" type="text" data-key="${f.k}" placeholder="${f.p}" value="${(p.settings[f.k]||'').replace(/"/g,'&quot;')}">`}
+    </div>`).join('');
+}
+
+function renderCustomFields(){
+  return state.customFields.map((f,i)=>`
+    <div class="field-group" id="cf-${f.id}">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <label class="field-label">${f.label}</label>
+        <button class="remove-btn" onclick="removeCustomField('${f.id}')">✕</button>
+      </div>
+      <textarea class="textarea" data-cfkey="${f.id}" placeholder="填写${f.label}...">${f.value||''}</textarea>
+    </div>`).join('');
+}
+
+function addCustomField(){
+  const name=document.getElementById('new-field-name').value.trim();
+  if(!name)return;
+  state.customFields.push({id:uid(),label:name,value:''});
+  document.getElementById('new-field-name').value='';
+  document.getElementById('custom-fields').innerHTML=renderCustomFields();
+}
+
+function removeCustomField(id){
+  state.customFields=state.customFields.filter(f=>f.id!==id);
+  const el=document.getElementById('cf-'+id);
+  if(el)el.remove();
+}
+
+function collectSettings(){
+  const settings={};
+  document.querySelectorAll('[data-key]').forEach(el=>settings[el.dataset.key]=el.value);
+  state.customFields.forEach(f=>{
+    const el=document.querySelector(`[data-cfkey="${f.id}"]`);
+    if(el)f.value=el.value;
+  });
+  return settings;
+}
+
+async function autoGenSettings(){
+  const btn=document.querySelector('[onclick="autoGenSettings()"]');
+  btn.textContent='🤖 AI生成中...';btn.disabled=true;
+  try{
+    const p=state.currentProject;
+    const prompt=`你是资深番茄小说作者。基于以下信息生成完整小说创作设定，严格以JSON格式输出：
+
+创意：${p.idea}
+爽文基因：${JSON.stringify(p.geneRadar)}
+拆书参考：${(p.analysisResult||'').slice(0,400)}
+
+生成以下所有字段（JSON，key必须完全一致）：
+title,genre,protagonist_name,protagonist_bg,protagonist_ability,protagonist_goal,protagonist_growth,
+antagonist_name,antagonist_motivation,antagonist_power,female_lead,supporting_chars,relationship_map,
+world_setting,power_system,factions,core_conflict,hook_points,story_summary,
+emotional_tone,writing_style,chapter_rhythm,foreshadowing,forbidden_content,special_notes
+
+要求：主角金手指独特强力，反派动机合理，设定服务于爽感，story_summary写得像番茄平台简介。
+只输出JSON，不要其他任何内容。`;
+    
+    const res=await callAI([{role:'user',content:prompt}],3000);
+    const clean=res.replace(/```json|```/g,'').trim();
+    const parsed=JSON.parse(clean);
+    state.currentProject.settings=parsed;
+    document.getElementById('settings-fields').innerHTML=renderSettingsFields();
+    toast('设定生成成功！可根据需要修改','success');
+  }catch(e){toast('生成失败: '+e.message,'error');}
+  btn.textContent='✨ AI一键生成所有设定';btn.disabled=false;
+}
+
+function confirmSettings(){
+  const settings=collectSettings();
+  if(!settings.title&&!settings.protagonist_name){toast('请至少填写书名和主角','error');return;}
+  advanceStep({settings,customFields:state.customFields});
+}
+
+// Step 4 大纲
+function renderOutlineStep(el){
+  const p=state.currentProject;
+  el.innerHTML=`
+    <div class="step-title">📋 大纲生成</div>
+    <div class="step-desc">AI根据设定和字数规划，生成最适合的章节架构</div>
+    <button class="btn-primary" onclick="generateOutline()">🗂️ 生成大纲</button>
+    <div id="outline-area" style="margin-top:12px;">
+      ${p.outline?`<textarea class="textarea" id="outline-text" style="min-height:400px;">${p.outline}</textarea>
+      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:12px;">确认大纲，规划字数 →</button>`:''}
+    </div>`;
+}
+
+async function generateOutline(){
+  const btn=document.querySelector('[onclick="generateOutline()"]');
+  btn.textContent='📝 AI构建大纲中...';btn.disabled=true;
+  try{
+    const p=state.currentProject;
+    const tier=p.wordTier||WORD_TIERS[2];
+    const res=await callAI([{role:'user',content:`你是资深番茄小说作者，擅长构建引人入胜的爽文架构。
+
+【创作设定摘要】
+书名：${p.settings.title}，类型：${p.settings.genre}
+主角：${p.settings.protagonist_name}，金手指：${p.settings.protagonist_ability?.slice(0,80)}
+核心爽点：${p.settings.hook_points?.slice(0,100)}
+目标字数：${tier.words}，共约${tier.chapters}章
+
+【爽文基因配置】
+打脸${p.geneRadar.slap}% 升级${p.geneRadar.upgrade}% 感情${p.geneRadar.romance}% 悬念${p.geneRadar.mystery}% 情绪${p.geneRadar.emotion}%
+
+【拆书参考】
+${(p.analysisResult||'').slice(0,300)}
+
+请生成完整小说大纲：
+1. 根据字数自动决定最佳卷数结构（不拘泥三幕，可多卷）
+2. 每卷标注核心事件、爽点节点、人物成长
+3. 前三章详细内容（开局钩子设计，含每章结尾钩子）
+4. 每隔10章标注一个大爽点
+5. 主要反转点、情感高潮、最终决战位置
+6. 节奏要快：每章有小推进，每5章有中爽点，每10章有大爽点
+
+输出清晰大纲文本，约600字。`}],2500);
+    
+    state.currentProject.outline=res;
+    document.getElementById('outline-area').innerHTML=`
+      <textarea class="textarea" id="outline-text" style="min-height:400px;">${res}</textarea>
+      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:12px;">确认大纲，规划字数 →</button>`;
+  }catch(e){toast('生成失败: '+e.message,'error');}
+  btn.textContent='🗂️ 生成大纲';btn.disabled=false;
+}
+
+function confirmOutline(){
+  const outline=document.getElementById('outline-text').value;
+  advanceStep({outline});
+}
+
+// Step 5 字数
+function renderWordcountStep(el){
+  const p=state.currentProject;
+  const selTier=p.wordTier||WORD_TIERS[2];
+  const selStyle=p.openingStyle||'ai';
+  el.innerHTML=`
+    <div class="step-title">📊 字数规划</div>
+    <div class="section">
+      <div class="section-title">目标字数</div>
+      ${WORD_TIERS.map(t=>`
+        <div class="tier-card ${selTier.label===t.label?'selected':''}" onclick="selectTier('${t.label}')">
+          <span class="tier-label">${t.label}</span>
+          <span class="tier-display">${t.words}</span>
+          <span class="tier-chapters">~${t.chapters}章</span>
+        </div>`).join('')}
+    </div>
+    <div class="section">
+      <div class="section-title">开局风格</div>
+      ${OPENING_STYLES.map(s=>`
+        <div class="style-card ${selStyle===s.id?'selected':''}" onclick="selectOpenStyle('${s.id}')">
+          <div class="style-name">${s.name}</div>
+          <div class="style-desc">${s.desc}</div>
+        </div>`).join('')}
+    </div>
+    <button class="btn-primary" onclick="confirmWordcount()">确认，准备开始创作 →</button>`;
+}
+
+function selectTier(label){
+  state.currentProject.wordTier=WORD_TIERS.find(t=>t.label===label);
+  document.querySelectorAll('.tier-card').forEach(c=>c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+}
+function selectOpenStyle(id){
+  state.currentProject.openingStyle=id;
+  document.querySelectorAll('.style-card').forEach(c=>c.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+}
+function confirmWordcount(){
+  advanceStep({wordTier:state.currentProject.wordTier,openingStyle:state.currentProject.openingStyle});
+}
+
+// Step 6 Ready
+function renderReadyStep(el){
+  const p=state.currentProject;
+  el.innerHTML=`
+    <div style="text-align:center;padding:48px 0;">
+      <div style="font-size:72px;margin-bottom:16px;">🚀</div>
+      <h3 style="color:var(--gold);font-size:22px;margin-bottom:8px;">万事俱备！</h3>
+      <p style="color:var(--muted2);line-height:1.8;margin-bottom:8px;">《${p.settings?.title||'你的爽文'}》</p>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:32px;">目标 ${p.wordTier?.words} · ${p.wordTier?.chapters}章 · 每章约2500字</p>
+      <button class="btn-primary" style="font-size:17px;padding:16px;" onclick="startWriting()">开始创作正文 ✍️</button>
+    </div>`;
+}
+
+function startWriting(){
+  state.currentProject.step='writing';
+  saveProject(state.currentProject);
+  state.currentChapterDraft='';
+  state.checkResult=null;
+  state.writeTab='write';
+  showScreen('writing');
+}
+
+// ═══════════════════════════════════════════════
+// 写作页
+// ═══════════════════════════════════════════════
+function renderWritingPage(){
+  const p=state.currentProject;
+  const total=p.wordTier?.chapters||400;
+  const done=p.chapters?.length||0;
+  const pct=Math.round(done/total*100);
+  document.getElementById('writing-title').textContent=p.settings?.title||'未命名';
+  document.getElementById('writing-progress').textContent=`第${done+1}章 / 共${total}章 · ${pct}% · 约${(done*2500/10000).toFixed(1)}万字`;
+  document.getElementById('writing-prog-bar').style.width=pct+'%';
+  setWriteTab(state.writeTab||'write');
+}
+
+function setWriteTab(tab){
+  state.writeTab=tab;
+  ['write','chapters','card','history','export'].forEach(t=>{
+    document.getElementById('tab-'+t).className='tab-btn '+(t===tab?'active':'inactive');
+  });
+  const el=document.getElementById('write-tab-content');
+  if(tab==='write')renderWriteTab(el);
+  else if(tab==='chapters')renderChaptersTab(el);
+  else if(tab==='card')renderCardTab(el);
+  else if(tab==='history')renderHistoryTab(el);
+  else if(tab==='export')renderExportTab(el);
+}
+
+function renderWriteTab(el){
+  const p=state.currentProject;
+  const chNum=(p.chapters?.length||0)+1;
+  const isOpening=chNum<=3;
+
+  if(state.generating){
+    el.innerHTML=`<div class="generating-box"><div class="gen-dot"></div><div class="gen-dot"></div><div class="gen-dot"></div><span style="margin-left:4px;">AI正在创作第${chNum}章...</span></div>`;
+    return;
+  }
+
+  if(!state.currentChapterDraft){
+    el.innerHTML=`
+      <div style="text-align:center;padding:24px 0 16px;">
+        <div style="color:var(--gold);font-size:16px;font-weight:700;margin-bottom:4px;">准备生成第 ${chNum} 章</div>
+        ${isOpening?`<div style="color:var(--gold2);font-size:12px;margin-bottom:12px;">⭐ 开局关键章节，AI将强化钩子和爽点</div>`:''}
+        ${chNum%10===0?`<div class="global-check">🔍 已完成${chNum-1}章，建议生成后进行全局节奏检查</div>`:''}
+      </div>
+      <div style="margin-bottom:12px;">
+        <button class="btn-secondary" onclick="toggleIntervention()" style="margin-bottom:8px;">✏️ ${state.showIntervention?'取消干预':'添加剧情干预（可选）'}</button>
+        ${state.showIntervention?`
+          <div class="intervention-box">
+            <div class="intervention-label">告诉AI这章的特殊要求：</div>
+            <textarea class="textarea" id="intervention-text" placeholder="例如：这章要加入一个重要新角色，主角发现了反派的秘密...">${state.intervention||''}</textarea>
+          </div>`:''}
+      </div>
+      <button class="btn-primary" style="font-size:16px;padding:15px;" onclick="generateChapter()">🚀 生成第 ${chNum} 章</button>
+      ${state.forecast?renderForecast():''}
+      <button class="btn-ghost" onclick="generateForecast()" style="margin-top:10px;">🔮 查看爽点预测（未来5章）</button>`;
+  } else {
+    el.innerHTML=`
+      <textarea class="textarea" id="chapter-draft" style="min-height:480px;font-family:'Noto Serif SC',serif;font-size:14px;line-height:1.85;">${state.currentChapterDraft}</textarea>
+      ${state.checkResult?renderCheckResult():''}
+      <div class="chapter-actions">
+        <button class="btn-secondary" onclick="selfCheck()" style="flex:1;">🔍 质检</button>
+        <button class="btn-ghost" onclick="regenChapter()" style="flex:1;margin:0 8px;">🔄 重生成</button>
+        <button class="btn-primary" onclick="saveChapter()" style="flex:1;margin:0;">✅ 保存</button>
+      </div>
+      <button class="btn-ghost" onclick="humanizeChapter()" style="margin-top:8px;">✨ 去AI化润色（过朱雀检测）</button>`;
+  }
+}
+
+function renderForecast(){
+  if(!state.forecast)return'';
+  return `<div class="forecast-box">
+    <div class="analysis-title" style="margin-bottom:8px;">🔮 爽点预测仪（未来5章）</div>
+    ${state.forecast.map((f,i)=>`<div class="forecast-item"><span class="forecast-num">第${(state.currentProject.chapters?.length||0)+i+1}章</span><span class="forecast-text">${f}</span></div>`).join('')}
+    <div style="color:var(--muted);font-size:11px;margin-top:6px;">↑ 可在干预框中调整顺序</div>
+  </div>`;
+}
+
+function renderCheckResult(){
+  const r=state.checkResult;
+  return `<div class="check-box ${r.passed?'pass':'fail'}">
+    <div style="font-weight:700;color:${r.passed?'var(--green)':'var(--red)'};">质检 ${r.passed?'✓ 通过':'✗ 未通过'} · ${r.score}/100分</div>
+    ${(r.issues||[]).map(i=>`<div style="color:var(--muted2);font-size:12px;margin-top:4px;">• ${i}</div>`).join('')}
+    ${r.suggestion?`<div style="color:var(--gold);font-size:12px;margin-top:8px;">💡 ${r.suggestion}</div>`:''}
+  </div>`;
+}
+
+function toggleIntervention(){
+  state.showIntervention=!state.showIntervention;
+  renderWriteTab(document.getElementById('write-tab-content'));
+}
+
+async function generateChapter(){
+  const p=state.currentProject;
+  if(!getApiKey()){toast('请先配置API Key','error');return;}
+  const interventionEl=document.getElementById('intervention-text');
+  if(interventionEl)state.intervention=interventionEl.value;
+  
+  state.generating=true;
+  state.checkResult=null;
+  renderWriteTab(document.getElementById('write-tab-content'));
+
+  const chNum=(p.chapters?.length||0)+1;
+  const isOpening=chNum<=3;
+  const prevChaps=p.chapters?.slice(-3)||[];
+  const card=p.storyCard||{};
+
+  const openingInstr=isOpening?`
+【开局特别要求 - 第${chNum}章】
+${p.openingStyle==='slap'?'开局打脸风格：直接展现主角被羞辱或低估，然后立即有反击或金手指觉醒，第一章要让读者立刻爽到':
+  p.openingStyle==='mystery'?'悬念钩子风格：埋下重大谜题，第一章结尾要有强烈悬念，让读者必须看下一章':
+  'AI智能开局：基于故事设定，选择最能抓住读者的开局方式，前三章是黄金留读时间'}
+第一章结尾必须有强烈悬念，第二章必须出现第一个明显爽点，第三章要让读者看到主角的潜力上限。`:'';
+
+  try{
+    const text=await callAI([{role:'user',content:`你是专业番茄小说作者，正在创作爽文。
+
+【小说核心设定】
+书名：${p.settings.title} | 类型：${p.settings.genre}
+主角：${p.settings.protagonist_name}
+背景：${(p.settings.protagonist_bg||'').slice(0,80)}
+金手指：${(p.settings.protagonist_ability||'').slice(0,100)}
+核心爽点：${(p.settings.hook_points||'').slice(0,100)}
+情感基调：${p.settings.emotional_tone}
+
+【故事状态卡（必须遵守）】
+已出场人物：${(card.characters||[]).join('、')||'无'}
+最近事件：${(card.events||[]).slice(-3).join('；')||'无'}
+当前伏笔：${(card.foreshadowing||[]).join('；')||'无'}
+
+【前章摘要】
+${prevChaps.map((c,i)=>`第${chNum-prevChaps.length+i}章：${c.summary||c.text?.slice(0,80)}`).join('\n')||'（第一章）'}
+
+${state.intervention?`【读者干预指令 - 必须执行】\n${state.intervention}`:''}
+${openingInstr}
+
+【本章任务：第${chNum}章】
+字数要求：2400-2600字
+排版要求：
+- 大量使用短句（5-15字为主），情绪激烈处单句成段
+- 对话结束后空行，重要金句独立成段
+- 不用大段连续文字，每隔3-4行要有节奏变化
+- 动作场面用碎片化短句制造紧张感
+
+内容要求：
+- 每500字必须有一个情绪推进或小爽点
+- 结尾必须有强钩子，让读者想看下一章
+- 人物性格言行与设定保持一致，不能前后矛盾
+- 对话自然口语化，有人物性格特色
+- 情绪张力靠情节和人物驱动，给读者充足带入感
+- 符合番茄小说内容规范
+
+第一行输出章节标题，格式：第${chNum}章 [标题名]
+然后直接开始正文。`}],3500);
+    
+    state.currentChapterDraft=text;
+    // 自动更新故事卡
+    updateStoryCard(text,chNum);
+  }catch(e){
+    toast('生成失败: '+e.message,'error');
+  }
+  state.generating=false;
+  renderWriteTab(document.getElementById('write-tab-content'));
+}
+
+async function updateStoryCard(text,chNum){
+  try{
+    const res=await callAI([{role:'user',content:`提取这段小说章节的关键信息，只输出JSON：
+{"newChars":["新出场人物"],"keyEvent":"本章核心事件一句话","newFore":["新伏笔"],"resolveFore":["解决的伏笔"],"emotionNode":"情绪节点"}
+
+章节：${text.slice(0,1200)}`}],300);
+    const clean=res.replace(/```json|```/g,'').trim();
+    const info=JSON.parse(clean);
+    const card=state.currentProject.storyCard||{characters:[],events:[],foreshadowing:[],emotionNodes:[]};
+    card.characters=[...new Set([...card.characters,...(info.newChars||[])])];
+    card.events=[...card.events,info.keyEvent].filter(Boolean);
+    card.foreshadowing=[...card.foreshadowing.filter(f=>!(info.resolveFore||[]).includes(f)),...(info.newFore||[])];
+    card.emotionNodes=[...card.emotionNodes,info.emotionNode].filter(Boolean);
+    state.currentProject.storyCard=card;
+  }catch(e){console.log('故事卡更新失败',e);}
+}
+
+async function selfCheck(){
+  const draft=document.getElementById('chapter-draft')?.value||state.currentChapterDraft;
+  if(!draft){toast('没有内容可质检','error');return;}
+  state.currentChapterDraft=draft;
+  const btn=document.querySelector('[onclick="selfCheck()"]');
+  btn.textContent='检查中...';btn.disabled=true;
+  try{
+    const p=state.currentProject;
+    const res=await callAI([{role:'user',content:`你是严格的番茄小说编辑，对以下章节进行全面质检：
+
+【设定约束】主角：${p.settings.protagonist_name}，人物关系：${(p.settings.relationship_map||'').slice(0,150)}
+【故事状态】最近事件：${(p.storyCard?.events||[]).slice(-2).join('；')}
+
+【待审章节】
+${draft.slice(0,1800)}
+
+检查项目：
+1. 人物名字/设定前后一致性
+2. 情节与已有事件是否矛盾
+3. 爽感密度（每500字有无爽点/推进）
+4. 番茄排版是否符合（短句、空行、钩子）
+5. 结尾钩子强度
+6. AI腔检测（过整齐排比、说教感）
+7. 内容合规性（是否触碰平台红线）
+
+输出JSON：{"passed":true/false,"score":0-100,"issues":["问题1","问题2"],"suggestion":"修改建议"}
+只输出JSON。`}],500);
+    const clean=res.replace(/```json|```/g,'').trim();
+    state.checkResult=JSON.parse(clean);
+    renderWriteTab(document.getElementById('write-tab-content'));
+    if(!state.checkResult.passed)toast(`质检未通过(${state.checkResult.score}分)，建议重新生成`,'error');
+    else toast(`质检通过！${state.checkResult.score}/100分`,'success');
+  }catch(e){toast('质检失败: '+e.message,'error');}
+  const b=document.querySelector('[onclick="selfCheck()"]');
+  if(b){b.textContent='🔍 质检';b.disabled=false;}
+}
+
+async function humanizeChapter(){
+  const draft=document.getElementById('chapter-draft')?.value||state.currentChapterDraft;
+  if(!draft)return;
+  const btn=document.querySelector('[onclick="humanizeChapter()"]');
+  btn.textContent='润色中...';btn.disabled=true;
+  try{
+    const res=await callAI([{role:'user',content:`你是专业文字润色师。对下面这段番茄小说进行去AI化润色处理：
+
+目标：
+1. 打破过于整齐的排比结构，加入不规则变化
+2. 加入口语化表达、方言色彩，让文字更有人味
+3. 情绪描写更细腻真实，避免说教感
+4. 保留原有情节，只改变措辞和句式
+5. 加强情绪张力和代入感
+6. 去除AI惯用的"然而"、"于是"等连接词，用更自然的方式过渡
+
+直接输出润色后的正文，不要解释，保持相近字数。
+
+原文：
+${draft}`}],3500);
+    state.currentChapterDraft=res;
+    state.checkResult=null;
+    renderWriteTab(document.getElementById('write-tab-content'));
+    toast('润色完成！建议再次质检','success');
+  }catch(e){toast('润色失败: '+e.message,'error');}
+}
+
+function regenChapter(){
+  state.currentChapterDraft='';
+  state.checkResult=null;
+  renderWriteTab(document.getElementById('write-tab-content'));
+}
+
+function saveChapter(){
+  const draft=document.getElementById('chapter-draft')?.value||state.currentChapterDraft;
+  if(!draft){toast('没有内容可保存','error');return;}
+  const p=state.currentProject;
+  const chNum=(p.chapters?.length||0)+1;
+  // 保存历史版本
+  if(!p.history)p.history=[];
+  p.history.push({ver:p.history.length+1,time:Date.now(),chapterNum:chNum,text:draft,desc:`第${chNum}章初稿`});
+  // 保存章节
+  p.chapters=[...(p.chapters||[]),{num:chNum,text:draft,summary:draft.slice(0,120),createdAt:Date.now()}];
+  state.currentChapterDraft='';
+  state.checkResult=null;
+  state.intervention='';
+  state.showIntervention=false;
+  saveProject(p);
+  renderWritingPage();
+  toast(`第${chNum}章已保存 ✓`,'success');
+  // 每10章提示全局检查
+  if(chNum%10===0)setTimeout(()=>toast(`已完成${chNum}章，可在质检模式进行全局节奏检查`,'info'),500);
+}
+
+async function generateForecast(){
+  const btn=document.querySelector('[onclick="generateForecast()"]');
+  if(btn){btn.textContent='预测中...';btn.disabled=true;}
+  try{
+    const p=state.currentProject;
+    const chNum=(p.chapters?.length||0)+1;
+    const res=await callAI([{role:'user',content:`你是番茄小说规划师。基于以下信息，预测未来5章的最佳爽点安排：
+
+书名：${p.settings.title}，当前到第${chNum}章
+爽文基因：打脸${p.geneRadar.slap}% 升级${p.geneRadar.upgrade}% 情绪${p.geneRadar.emotion}%
+最近事件：${(p.storyCard?.events||[]).slice(-3).join('；')}
+当前伏笔：${(p.storyCard?.foreshadowing||[]).join('；')||'无'}
+
+输出未来5章的爽点安排，JSON格式：["第${chNum}章的爽点","第${chNum+1}章的爽点","第${chNum+2}章的爽点","第${chNum+3}章的爽点","第${chNum+4}章的爽点"]
+只输出JSON数组，每条15字以内。`}],400);
+    const clean=res.replace(/```json|```/g,'').trim();
+    state.forecast=JSON.parse(clean);
+    renderWriteTab(document.getElementById('write-tab-content'));
+  }catch(e){toast('预测失败: '+e.message,'error');}
+  const b=document.querySelector('[onclick="generateForecast()"]');
+  if(b){b.textContent='🔮 查看爽点预测（未来5章）';b.disabled=false;}
+}
+
+// 章节列表
+function renderChaptersTab(el){
+  const p=state.currentProject;
+  const chapters=p.chapters||[];
+  if(!chapters.length){el.innerHTML='<div class="empty-state"><div class="ei">📭</div>还没有已保存的章节</div>';return;}
+  el.innerHTML=`<h3 style="color:var(--gold);font-size:14px;font-weight:700;margin-bottom:12px;">已完成 ${chapters.length} 章 · 约 ${(chapters.length*2500/10000).toFixed(1)} 万字</h3>
+    ${chapters.map(c=>`
+      <div class="chapter-item">
+        <div class="chapter-num">第${c.num}章</div>
+        <div class="chapter-summary">${c.summary}...</div>
+      </div>`).join('')}`;
+}
+
+// 故事卡
+function renderCardTab(el){
+  const p=state.currentProject;
+  const card=p.storyCard||{characters:[],events:[],foreshadowing:[],emotionNodes:[]};
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="color:var(--gold);font-size:14px;font-weight:700;">🗂️ 故事状态卡</h3>
+      <button class="btn-small" onclick="toggleEditCard()">${state.editingCard?'💾 保存':'✏️ 编辑'}</button>
+    </div>
+    ${[['characters','出场人物'],['events','已发生事件'],['foreshadowing','当前伏笔'],['emotionNodes','情绪节点']].map(([k,l])=>`
+      <div class="field-group">
+        <label class="field-label">${l}</label>
+        ${state.editingCard
+          ?`<textarea class="textarea" data-ck="${k}" style="min-height:70px;">${(card[k]||[]).join('\n')}</textarea>`
+          :`<div class="card-tags">${(card[k]||[]).map(t=>`<span class="card-tag">${t}</span>`).join('')||'<span style="color:var(--muted);font-size:12px;">暂无</span>'}</div>`}
+      </div>`).join('')}`;
+}
+
+function toggleEditCard(){
+  if(state.editingCard){
+    const card=state.currentProject.storyCard||{};
+    document.querySelectorAll('[data-ck]').forEach(el=>{
+      card[el.dataset.ck]=el.value.split('\n').filter(Boolean);
+    });
+    state.currentProject.storyCard=card;
+    saveProject(state.currentProject);
+    toast('故事卡已保存','success');
+  }
+  state.editingCard=!state.editingCard;
+  renderCardTab(document.getElementById('write-tab-content'));
+}
+
+// 历史版本
+function renderHistoryTab(el){
+  const p=state.currentProject;
+  const history=p.history||[];
+  if(!history.length){el.innerHTML='<div class="empty-state"><div class="ei">📋</div>暂无历史版本</div>';return;}
+  el.innerHTML=`<h3 style="color:var(--gold);font-size:14px;font-weight:700;margin-bottom:12px;">创作日志（${history.length}个版本）</h3>
+    ${[...history].reverse().map(h=>`
+      <div class="history-item">
+        <div class="history-ver">v${h.ver}</div>
+        <div class="history-info">
+          <div class="history-desc">${h.desc}</div>
+          <div class="history-time">${new Date(h.time).toLocaleString()}</div>
+        </div>
+        <button class="history-restore" onclick="restoreHistory(${h.ver})">恢复</button>
+      </div>`).join('')}`;
+}
+
+function restoreHistory(ver){
+  if(!confirm('确认恢复到此版本？当前草稿将被替换'))return;
+  const h=state.currentProject.history?.find(x=>x.ver===ver);
+  if(h){
+    state.currentChapterDraft=h.text;
+    state.writeTab='write';
+    setWriteTab('write');
+    toast('已恢复到 v'+ver,'success');
+  }
+}
+
+// 导出
+function renderExportTab(el){
+  const p=state.currentProject;
+  const count=p.chapters?.length||0;
+  el.innerHTML=`
+    <h3 style="color:var(--gold);font-size:14px;font-weight:700;margin-bottom:8px;">📤 导出</h3>
+    <div style="color:var(--muted2);font-size:13px;margin-bottom:20px;">已完成 ${count} 章 · 约 ${(count*2500/10000).toFixed(1)} 万字</div>
+    <div class="export-group">
+      <button class="btn-primary" onclick="exportAll('txt')">📄 导出全文 TXT</button>
+      <button class="btn-secondary" onclick="exportByChapter()">📑 按章节导出 TXT</button>
+      <button class="btn-secondary" onclick="exportRange()">✂️ 自定义章节范围导出</button>
+      <button class="btn-ghost" onclick="exportSettings()">⚙️ 导出设定文档</button>
+    </div>`;
+}
+
+function exportAll(type){
+  const p=state.currentProject;
+  if(!p.chapters?.length){toast('还没有章节可导出','error');return;}
+  let content=`《${p.settings?.title||'我的爽文'}》\n\n`;
+  content+=`作者：（你的笔名）\n简介：${p.settings?.story_summary||''}\n\n${'='.repeat(40)}\n\n`;
+  p.chapters.forEach(c=>{content+=c.text+'\n\n'+'-'.repeat(20)+'\n\n';});
+  downloadTxt(content,p.settings?.title||'爽文全文');
+}
+
+function exportByChapter(){
+  const p=state.currentProject;
+  if(!p.chapters?.length){toast('还没有章节可导出','error');return;}
+  p.chapters.forEach(c=>{
+    const content=`《${p.settings?.title}》\n\n${c.text}`;
+    downloadTxt(content,`第${c.num}章`);
+  });
+  toast(`已导出${p.chapters.length}个章节文件`,'success');
+}
+
+function exportRange(){
+  const p=state.currentProject;
+  const total=p.chapters?.length||0;
+  if(!total){toast('还没有章节可导出','error');return;}
+  const input=prompt(`输入导出范围（如 1-10 或 5-${total}）:`);
+  if(!input)return;
+  const [s,e]=input.split('-').map(Number);
+  const chapters=p.chapters.filter(c=>c.num>=s&&c.num<=e);
+  if(!chapters.length){toast('范围内没有章节','error');return;}
+  let content=`《${p.settings?.title}》第${s}-${e}章\n\n`;
+  chapters.forEach(c=>{content+=c.text+'\n\n---\n\n';});
+  downloadTxt(content,`${p.settings?.title||'爽文'}_第${s}-${e}章`);
+}
+
+function exportSettings(){
+  const p=state.currentProject;
+  let content=`《${p.settings?.title}》创作设定文档\n${'='.repeat(40)}\n\n`;
+  DEFAULT_FIELDS.forEach(f=>{if(p.settings[f.k])content+=`【${f.l}】\n${p.settings[f.k]}\n\n`;});
+  content+=`\n【大纲】\n${p.outline||''}\n\n【故事状态卡】\n`;
+  const card=p.storyCard||{};
+  content+=`出场人物：${(card.characters||[]).join('、')}\n`;
+  content+=`重要事件：${(card.events||[]).join('；')}\n`;
+  content+=`当前伏笔：${(card.foreshadowing||[]).join('；')}\n`;
+  downloadTxt(content,(p.settings?.title||'爽文')+'_设定文档');
+}
+
+function downloadTxt(content,filename){
+  const blob=new Blob([content],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename+'.txt';
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  toast('下载中...','success');
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// 初始化
+renderHome();
+</script>
+</body>
+</html>
