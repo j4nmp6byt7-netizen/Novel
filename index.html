@@ -883,15 +883,26 @@ function renderSettingsStep(el){
     <button class="btn-primary" onclick="confirmSettings()" style="margin-top:16px;">确认设定，生成大纲 →</button>`;
 }
 
+function safeStr(v){
+  if(v===null||v===undefined)return'';
+  if(typeof v==='string')return v;
+  if(Array.isArray(v))return v.join('、');
+  if(typeof v==='object')return JSON.stringify(v);
+  return String(v);
+}
+
 function renderSettingsFields(){
   const p=state.currentProject;
-  return DEFAULT_FIELDS.map(f=>`
+  return DEFAULT_FIELDS.map(f=>{
+    const val=safeStr(p.settings[f.k]);
+    return `
     <div class="field-group">
       <label class="field-label">${f.l}</label>
       ${f.t==='textarea'
-        ?`<textarea class="textarea" data-key="${f.k}" placeholder="${f.p}">${p.settings[f.k]||''}</textarea>`
-        :`<input class="inp" type="text" data-key="${f.k}" placeholder="${f.p}" value="${(p.settings[f.k]||'').replace(/"/g,'&quot;')}">`}
-    </div>`).join('');
+        ?`<textarea class="textarea" data-key="${f.k}" placeholder="${f.p}">${val}</textarea>`
+        :`<input class="inp" type="text" data-key="${f.k}" placeholder="${f.p}" value="${val.replace(/"/g,'&quot;').replace(/\n/g,' ')}">`}
+    </div>`;
+  }).join('');
 }
 
 function renderCustomFields(){
@@ -1197,7 +1208,8 @@ function renderWriteTab(el){
         <button class="btn-ghost" onclick="regenChapter()" style="flex:1;margin:0 8px;">🔄 重生成</button>
         <button class="btn-primary" onclick="saveChapter()" style="flex:1;margin:0;">✅ 保存</button>
       </div>
-      <button class="btn-ghost" onclick="humanizeChapter()" style="margin-top:8px;">✨ 去AI化润色（过朱雀检测）</button>`;
+      <button class="btn-ghost" onclick="humanizeChapter()" style="margin-top:8px;">✨ 去AI化润色（过朱雀检测）</button>
+      <button class="btn-ghost" onclick="formatTomato()" style="margin-top:6px;">🍅 番茄排版一键格式化</button>`;
   }
 }
 
@@ -1446,6 +1458,51 @@ function regenChapter(){
   renderWriteTab(document.getElementById('write-tab-content'));
 }
 
+// 番茄排版一键格式化
+function formatTomato(){
+  const ta=document.getElementById('chapter-draft');
+  if(!ta){toast('没有内容','error');return;}
+  let text=ta.value;
+  if(!text.trim()){toast('没有内容','error');return;}
+
+  // Step 1: Normalize line endings
+  text=text.replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+
+  // Step 2: Remove excessive blank lines (3+ -> 1)
+  text=text.replace(/\n{3,}/g,'\n\n');
+
+  // Step 3: Break overly long sentences (>25 chars without punctuation break)
+  // Add line break after strong punctuation if followed by more text and line is very long
+  const lines=text.split('\n');
+  const processed=lines.map(line=>{
+    if(line.length<=30)return line;
+    // After dialogue end quotes, break if next content continues
+    line=line.replace(/([""」』])(\s*)([^\n""「『])/g,'$1\n$3');
+    // After strong sentence-ending punctuation in long lines, add paragraph break
+    line=line.replace(/([。！？…]{1,2})([^\n。！？…""」』]{15,})/g,'$1\n$2');
+    return line;
+  });
+  text=processed.join('\n');
+
+  // Step 4: Ensure dialogue lines are on their own paragraphs
+  text=text.replace(/([^\n])([""「『])/g,'$1\n$2');
+
+  // Step 5: Emotional/action lines - if line is short action (≤12 chars), keep alone
+  // Step 6: Remove trailing spaces
+  text=text.split('\n').map(l=>l.trimEnd()).join('\n');
+
+  // Step 7: Ensure blank line before and after dialogue blocks
+  text=text.replace(/\n([""「『][^\n]+[""」』])/g,'\n\n$1');
+  text=text.replace(/([""「『][^\n]+[""」』])\n([^\n""「『])/g,'$1\n\n$2');
+
+  // Step 8: Clean up - max 2 consecutive blank lines again
+  text=text.replace(/\n{3,}/g,'\n\n').trim();
+
+  ta.value=text;
+  state.currentChapterDraft=text;
+  toast('番茄排版格式化完成 ✓','success');
+}
+
 function saveChapter(){
   const draft=document.getElementById('chapter-draft')?.value||state.currentChapterDraft;
   if(!draft){toast('没有内容可保存','error');return;}
@@ -1495,12 +1552,91 @@ function renderChaptersTab(el){
   const p=state.currentProject;
   const chapters=p.chapters||[];
   if(!chapters.length){el.innerHTML='<div class="empty-state"><div class="ei">📭</div>还没有已保存的章节</div>';return;}
-  el.innerHTML=`<h3 style="color:var(--gold);font-size:14px;font-weight:700;margin-bottom:12px;">已完成 ${chapters.length} 章 · 约 ${(chapters.length*2500/10000).toFixed(1)} 万字</h3>
+  const totalWords=chapters.reduce((s,c)=>s+(c.text?.length||0),0);
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="color:var(--gold);font-size:14px;font-weight:700;">已完成 ${chapters.length} 章 · 约 ${(totalWords/10000).toFixed(1)} 万字</h3>
+      <button class="btn-small" onclick="viewAllChapters()">📖 连续阅读</button>
+    </div>
     ${chapters.map(c=>`
-      <div class="chapter-item">
-        <div class="chapter-num">第${c.num}章</div>
-        <div class="chapter-summary">${c.summary}...</div>
+      <div class="chapter-item" style="cursor:pointer;" onclick="viewChapter(${c.num})">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div class="chapter-num">第${c.num}章</div>
+          <div style="display:flex;gap:6px;">
+            <span style="color:var(--muted);font-size:11px;">${c.text?.length||0}字</span>
+            <button class="btn-small" style="padding:2px 8px;font-size:11px;" onclick="event.stopPropagation();editChapter(${c.num})">编辑</button>
+            <button style="background:transparent;border:none;color:var(--red);font-size:12px;cursor:pointer;padding:0 2px;" onclick="event.stopPropagation();deleteChapter(${c.num})">🗑</button>
+          </div>
+        </div>
+        <div class="chapter-summary">${(c.summary||c.text?.slice(0,80)||'')}...</div>
       </div>`).join('')}`;
+}
+
+function viewChapter(num){
+  const p=state.currentProject;
+  const c=p.chapters.find(x=>x.num===num);
+  if(!c)return;
+  showReaderModal(c.text,`第${num}章`);
+}
+
+function viewAllChapters(){
+  const p=state.currentProject;
+  if(!p.chapters?.length){toast('还没有章节','error');return;}
+  const fullText=p.chapters.map(c=>c.text).join('\n\n────────────────────\n\n');
+  showReaderModal(fullText,`《${p.settings?.title||'未命名'}》全文阅读`);
+}
+
+function showReaderModal(text,title){
+  // Remove existing
+  const existing=document.getElementById('reader-modal');
+  if(existing)existing.remove();
+  const modal=document.createElement('div');
+  modal.id='reader-modal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9000;display:flex;flex-direction:column;';
+  modal.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#0f0f1a;border-bottom:1px solid #1e1e2e;flex-shrink:0;">
+      <span style="color:#f0a500;font-weight:700;font-size:14px;">${title}</span>
+      <div style="display:flex;gap:8px;">
+        <button onclick="copyReaderText()" style="background:transparent;border:1px solid #1e1e2e;color:#9898aa;border-radius:7px;padding:5px 12px;font-size:12px;cursor:pointer;font-family:inherit;">复制全文</button>
+        <button onclick="document.getElementById('reader-modal').remove()" style="background:transparent;border:none;color:#9898aa;font-size:22px;cursor:pointer;line-height:1;">×</button>
+      </div>
+    </div>
+    <div id="reader-text" style="flex:1;overflow-y:auto;padding:20px 18px;font-family:'Noto Serif SC',serif;font-size:15px;line-height:2;color:#e2e2e8;white-space:pre-wrap;word-break:break-all;">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+  `;
+  document.body.appendChild(modal);
+}
+
+function copyReaderText(){
+  const el=document.getElementById('reader-text');
+  if(!el)return;
+  navigator.clipboard.writeText(el.innerText).then(()=>toast('已复制到剪贴板','success')).catch(()=>{
+    const ta=document.createElement('textarea');
+    ta.value=el.innerText;
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+    toast('已复制','success');
+  });
+}
+
+function editChapter(num){
+  const p=state.currentProject;
+  const c=p.chapters.find(x=>x.num===num);
+  if(!c)return;
+  state.currentChapterDraft=c.text;
+  // Remove from chapters so it can be re-saved
+  p.chapters=p.chapters.filter(x=>x.num!==num);
+  saveProject(p);
+  state.writeTab='write';
+  setWriteTab('write');
+  toast(`第${num}章已载入编辑器，修改后点保存`,'success');
+}
+
+function deleteChapter(num){
+  if(!confirm(`确认删除第${num}章？`))return;
+  const p=state.currentProject;
+  p.chapters=p.chapters.filter(x=>x.num!==num);
+  saveProject(p);
+  renderChaptersTab(document.getElementById('write-tab-content'));
+  toast(`第${num}章已删除`,'success');
 }
 
 // 故事卡
