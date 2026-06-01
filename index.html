@@ -390,6 +390,7 @@ let state = {
   customFields: [],
   editingCard: false,
   forecast: null,
+  batchStop: false,
 };
 
 // ═══════════════════════════════════════════════
@@ -741,62 +742,98 @@ function renderAnalysisStep(el){
   const p=state.currentProject;
   el.innerHTML=`
     <div class="step-title">📚 拆书分析</div>
-    <div class="step-desc">AI分析同类爆款爽文，提炼爽文基因结构</div>
-    ${!p.analysisResult?`<button class="btn-primary" onclick="runAnalysis()">🚀 开始拆书分析</button>`:''}
+    <div class="step-desc">三步拆书：提炼同类爆款结构基因，为你的故事找到最优爽文公式</div>
+    ${!p.analysisResult?`
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px;">
+      <button class="btn-primary" onclick="runAnalysis('full')">🚀 一键完整拆书（推荐）</button>
+      <button class="btn-secondary" onclick="runAnalysis('books')">📖 方案一：输入同类书名精准拆书</button>
+      <button class="btn-ghost" onclick="runAnalysis('fast')">⚡ 快速分析（省Token）</button>
+    </div>`:''}
     <div id="analysis-log"></div>
     <div id="analysis-result">${p.analysisResult?renderAnalysisResult(p.analysisResult,p.geneRadar):''}</div>`;
 }
 
-async function runAnalysis(){
+async function runAnalysis(mode='full'){
   const p=state.currentProject;
   const logEl=document.getElementById('analysis-log');
   const resEl=document.getElementById('analysis-result');
-  const btn=document.querySelector('[onclick="runAnalysis()"]');
-  if(btn)btn.remove();
+  // Remove buttons
+  document.querySelectorAll('[onclick^="runAnalysis"]').forEach(b=>b.remove());
 
-  function log(msg,cls=''){logEl.innerHTML+=`<div class="log-item ${cls}">${msg}</div>`;logEl.scrollTop=logEl.scrollHeight;}
-  logEl.innerHTML='<div class="log-box">';
-  log('🔍 AI分析创意，提取搜索关键词...');
-  
+  function log(msg,cls=''){
+    if(!logEl.querySelector('.log-box'))logEl.innerHTML='<div class="log-box"></div>';
+    logEl.querySelector('.log-box').innerHTML+=`<div class="log-item ${cls}">${msg}</div>`;
+    logEl.scrollTop=logEl.scrollHeight;
+  }
+
+  let bookNames='';
+  if(mode==='books'){
+    bookNames=prompt('请输入1-5本同类爆款书名（逗号分隔），AI将精准拆解其结构：\n例如：赘婿,斗破苍穹,全职高手');
+    if(!bookNames){renderAnalysisStep(document.getElementById('step-content'));return;}
+  }
+
   try{
+    log('🔍 分析创意类型，提取核心基因关键词...');
     const kwRes=await callAI([{role:'user',content:`根据小说创意：「${p.idea}」
-提取3个最适合搜索同类爽文的关键词，每个2-4字，只输出关键词用逗号分隔，不要其他。`}],100);
-    log('✓ 关键词：'+kwRes,'ok');
-    log('📖 尝试主力通道：番茄小说热榜...','warn');
-    await sleep(1200);
-    log('⚠️ 主力通道受跨域限制，切换备用通道1...','warn');
-    await sleep(800);
-    log('⚠️ 备用通道1受限，激活备用通道2：AI深度推断...','warn');
-    await sleep(600);
-    log('✓ AI深度推断模式激活，基于训练数据分析同类爆款','ok');
-    log('🧬 深度分析爽文基因结构，请稍候...');
+提取3个关键词（2-4字），代表该爽文的核心类型和爽点，只输出关键词用逗号分隔，不要其他。`}],80);
+    log('✓ 核心关键词：'+kwRes,'ok');
 
-    const analysis=await callAI([{role:'user',content:`你是专业网络小说分析师，精通番茄爽文套路。
+    let mainPrompt='';
+    if(mode==='books'&&bookNames){
+      log(`📖 精准拆解指定书目：${bookNames}...`,'warn');
+      mainPrompt=`你是顶级番茄爽文编辑，精通网络小说结构分析。
+
+用户指定参考书目：${bookNames}
+用户创意：${p.idea}
+前置分析：${p.aiIdeaAnalysis||''}
+
+请对上述书目进行深度拆书，然后结合用户创意输出"爽文基因报告"：
+
+【指定书目拆解】逐一分析每本书的：开局公式、爽点节奏、主角成长曲线、核心钩子设计
+【通用套路提炼】从这些书中提炼出该类型的标准剧情公式（必须具体，给出章节节点）
+【爽点节奏规律】每隔多少章设置什么类型的爽点，用数字说明
+【人物塑造模板】主角/反派/女主的标准塑造方式，包括典型对话风格
+【开局三章公式】该类型最有效的前三章结构，具体到每章做什么
+【读者留存钩子】5种核心钩子类型及用法
+【结合用户创意的建议】如何将上述公式用在「${p.idea}」上
+【必须避开的坑】该类型最常见的失败写法
+
+输出900字以上，要具体实用，不要空话。`;
+    } else if(mode==='fast'){
+      log('⚡ 快速基因分析中...','warn');
+      mainPrompt=`你是番茄爽文编辑。根据创意：「${p.idea}」，快速输出爽文基因报告（约400字）：
+【类型定位】【核心套路】【开局公式】【爽点节奏】【避坑指南】
+简洁实用，直接给可执行建议。`;
+    } else {
+      log('🧬 深度分析同类爆款基因结构...','warn');
+      mainPrompt=`你是顶级番茄爽文编辑，精通网络小说结构分析。
 
 用户创意：${p.idea}
-AI前置分析：${p.aiIdeaAnalysis||''}
+前置分析：${p.aiIdeaAnalysis||''}
+核心关键词：${kwRes}
 
-基于对同类番茄爆款的深度理解，输出完整"爽文基因报告"：
+基于对番茄平台同类爆款的深度理解，输出完整"爽文基因报告"：
 
-【同类爆款书单】列举3-5本真实同类高热度作品，简述各自核心套路
-【套路结构模板】该类型标准剧情架构（分阶段）
-【爽点节奏规律】爽点频率、类型分布、节奏把控
-【人物模板分析】主角/反派/女主的塑造方式
-【番茄排版特征】爽文的典型排版和文字风格
-【开局三章公式】该类型最有效的开篇方式
-【读者留存钩子】让读者不断追更的核心机制
-【常见翻车写法】该类型要避开的坑
+【同类爆款书单】列举4-6本真实的该类型高热度作品，每本用一句话说明其最核心的爽文套路
+【套路结构模板】该类型标准剧情架构，必须细化到章节阶段（如第1-5章做什么，6-20章做什么，以此类推）
+【爽点节奏规律】具体：每隔几章设一个小爽点、几章设中爽点、几章设大爽点，各用什么类型的爽点
+【人物塑造模板】主角初始状态设定、金手指触发时机、反派出场时机、感情线布局节点
+【番茄排版特征】爽文的典型排版和文字风格，给出具体示例句型
+【开局三章公式】该类型最有效的前三章结构：第一章必须有什么，第二章必须有什么，第三章必须有什么
+【读者留存钩子】6种核心钩子机制，每种给出具体用法
+【必须避开的坑】该类型最常见的5种失败写法，用过的就直接扑街
 
-输出约600字，专业详细。`}],2000);
-    
+输出1000字以上，要求极度具体实用，每个模块都要有可直接操作的细节，不要泛泛而谈。`;
+    }
+
+    const analysis=await callAI([{role:'user',content:mainPrompt}],mode==='fast'?1500:3500);
     log('✅ 爽文基因报告生成完毕！','ok');
-    logEl.innerHTML='<div class="log-box">'+logEl.querySelector('.log-box').innerHTML+'</div>';
-    
     p.analysisResult=analysis;
     resEl.innerHTML=renderAnalysisResult(analysis,p.geneRadar);
   }catch(e){
     log('❌ 分析失败: '+e.message,'err');
     toast('分析失败: '+e.message,'error');
+    renderAnalysisStep(document.getElementById('step-content'));
   }
 }
 
@@ -947,36 +984,74 @@ async function generateOutline(){
   try{
     const p=state.currentProject;
     const tier=p.wordTier||WORD_TIERS[2];
-    const res=await callAI([{role:'user',content:`你是资深番茄小说作者，擅长构建引人入胜的爽文架构。
+    // 根据字数规划卷数和章节分布
+    const totalCh=tier.chapters;
+    const volCount=totalCh<=200?3:totalCh<=400?4:totalCh<=600?5:6;
+    const chPerVol=Math.floor(totalCh/volCount);
 
-【创作设定摘要】
-书名：${p.settings.title}，类型：${p.settings.genre}
-主角：${p.settings.protagonist_name}，金手指：${p.settings.protagonist_ability?.slice(0,80)}
-核心爽点：${p.settings.hook_points?.slice(0,100)}
-目标字数：${tier.words}，共约${tier.chapters}章
+    const res=await callAI([{role:'user',content:`你是资深番茄小说作者，必须生成一份严谨可执行的小说大纲，不允许敷衍或天马行空。
 
-【爽文基因配置】
-打脸${p.geneRadar.slap}% 升级${p.geneRadar.upgrade}% 感情${p.geneRadar.romance}% 悬念${p.geneRadar.mystery}% 情绪${p.geneRadar.emotion}%
+【创作设定】
+书名：${p.settings.title}
+类型：${p.settings.genre}
+主角：${p.settings.protagonist_name}
+主角背景：${(p.settings.protagonist_bg||'').slice(0,100)}
+金手指/核心能力：${(p.settings.protagonist_ability||'').slice(0,120)}
+核心爽点：${(p.settings.hook_points||'').slice(0,120)}
+反派：${p.settings.antagonist_name}，动机：${(p.settings.antagonist_motivation||'').slice(0,80)}
+女主：${p.settings.female_lead||''}
+世界观：${(p.settings.world_setting||'').slice(0,100)}
+能力体系：${(p.settings.power_system||'').slice(0,100)}
+核心矛盾：${(p.settings.core_conflict||'').slice(0,100)}
+目标字数：${tier.words}，共约${totalCh}章，分${volCount}卷
 
-【拆书参考】
-${(p.analysisResult||'').slice(0,300)}
+【爽文基因配置】打脸${p.geneRadar.slap}% 升级${p.geneRadar.upgrade}% 感情${p.geneRadar.romance}% 悬念${p.geneRadar.mystery}% 情绪${p.geneRadar.emotion}%
 
-请生成完整小说大纲：
-1. 根据字数自动决定最佳卷数结构（不拘泥三幕，可多卷）
-2. 每卷标注核心事件、爽点节点、人物成长
-3. 前三章详细内容（开局钩子设计，含每章结尾钩子）
-4. 每隔10章标注一个大爽点
-5. 主要反转点、情感高潮、最终决战位置
-6. 节奏要快：每章有小推进，每5章有中爽点，每10章有大爽点
+【输出要求 - 必须严格遵守】
 
-输出清晰大纲文本，约600字。`}],2500);
+一、总体架构概览（4-5句话说明整体走向）
+
+二、分卷大纲（每卷必须包含以下所有内容）
+格式如下（共${volCount}卷，每卷约${chPerVol}章）：
+
+第X卷【卷名】（第X-X章）
+- 本卷核心任务：（主角这一段的核心目标）
+- 主要矛盾/对手：（这一卷的主要敌对力量）
+- 能力成长：（主角在这一卷获得的关键能力/境界提升）
+- 大爽点节点：（具体说明3-5个大爽点，标明大约在哪章）
+- 感情线进展：（感情线在这一卷如何推进）
+- 本卷结尾钩子：（这一卷结尾留下什么悬念引入下卷）
+
+三、前五章详细内容（这是最关键的，必须非常具体）
+第1章：（具体场景、开局事件、悬念设置，结尾钩子是什么）
+第2章：（第一个爽点如何设置，读者看完第2章后会产生什么期待）
+第3章：（展现主角潜力上限，强化读者粘性）
+第4章：（剧情如何推进，矛盾如何激化）
+第5章：（第一个中型爽点，让读者看到故事走向）
+
+四、关键转折点清单（按章节顺序列举，标明章节区间）
+- 第一个重大打脸：约第X章
+- 第一次大幅实力提升：约第X章
+- 感情线第一次升温：约第X章
+- 主要反派首次正面交锋：约第X章
+- 中期高潮大战：约第X章
+- 故事转折/反转：约第X章
+- 最终决战：约第X章
+
+五、节奏控制规则（本书专属）
+- 小爽点节奏：每__章一个
+- 中爽点节奏：每__章一个
+- 大爽点节奏：每__章一个
+- 每章结尾钩子类型：（悬念/冲突/反转/预告，轮换规律）
+
+注意：所有内容必须基于上面的人物设定，不允许引入设定中没有的人物或能力，不允许写"后期会更精彩"这类空话。`}],4000);
     
     state.currentProject.outline=res;
     document.getElementById('outline-area').innerHTML=`
-      <textarea class="textarea" id="outline-text" style="min-height:400px;">${res}</textarea>
+      <textarea class="textarea" id="outline-text" style="min-height:500px;">${res}</textarea>
       <button class="btn-primary" onclick="confirmOutline()" style="margin-top:12px;">确认大纲，规划字数 →</button>`;
   }catch(e){toast('生成失败: '+e.message,'error');}
-  btn.textContent='🗂️ 生成大纲';btn.disabled=false;
+  btn.textContent='🗂️ 重新生成大纲';btn.disabled=false;
 }
 
 function confirmOutline(){
@@ -1100,6 +1175,17 @@ function renderWriteTab(el){
           </div>`:''}
       </div>
       <button class="btn-primary" style="font-size:16px;padding:15px;" onclick="generateChapter()">🚀 生成第 ${chNum} 章</button>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:10px;">
+        <div style="color:var(--gold);font-size:12px;font-weight:700;margin-bottom:10px;">⚡ 批量生成正文</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+          <span style="color:var(--muted2);font-size:13px;">从第${chNum}章生成</span>
+          <input type="number" id="batch-count" min="2" max="20" value="5" class="inp" style="width:70px;text-align:center;">
+          <span style="color:var(--muted2);font-size:13px;">章</span>
+        </div>
+        <div style="color:var(--muted);font-size:11px;margin-bottom:10px;">每章约2500字，自动保存，可随时中断。建议每次最多10章。</div>
+        <button class="btn-secondary" onclick="generateBatch()" id="batch-btn">⚡ 开始批量生成</button>
+        <div id="batch-log" style="margin-top:8px;"></div>
+      </div>
       ${state.forecast?renderForecast():''}
       <button class="btn-ghost" onclick="generateForecast()" style="margin-top:10px;">🔮 查看爽点预测（未来5章）</button>`;
   } else {
@@ -1138,6 +1224,118 @@ function toggleIntervention(){
   renderWriteTab(document.getElementById('write-tab-content'));
 }
 
+async function generateBatch(){
+  const countInput=document.getElementById('batch-count');
+  const count=Math.min(20,Math.max(2,parseInt(countInput?.value)||5));
+  const logEl=document.getElementById('batch-log');
+  const btn=document.getElementById('batch-btn');
+  if(btn){btn.textContent='⏹ 中断批量生成';btn.onclick=()=>{state.batchStop=true;btn.textContent='正在中断...';btn.disabled=true;};}
+  state.batchStop=false;
+
+  function batchLog(msg,cls=''){
+    if(!logEl)return;
+    logEl.innerHTML+=`<div class="log-item ${cls}" style="margin-bottom:3px;">${msg}</div>`;
+    logEl.scrollTop=logEl.scrollHeight;
+  }
+
+  let successCount=0;
+  for(let i=0;i<count;i++){
+    if(state.batchStop){batchLog('⏹ 已中断','warn');break;}
+    const p=state.currentProject;
+    const chNum=(p.chapters?.length||0)+1;
+    batchLog(`📝 正在生成第 ${chNum} 章...`);
+    try{
+      const text=await buildChapterText(p,chNum);
+      // Auto-save
+      if(!p.history)p.history=[];
+      p.history.push({ver:p.history.length+1,time:Date.now(),chapterNum:chNum,text,desc:`第${chNum}章（批量生成）`});
+      p.chapters=[...(p.chapters||[]),{num:chNum,text,summary:text.slice(0,120),createdAt:Date.now()}];
+      saveProject(p);
+      updateStoryCard(text,chNum);
+      successCount++;
+      batchLog(`✓ 第 ${chNum} 章已保存（约${Math.round(text.length)}字）`,'ok');
+      renderWritingPage();
+      // Small delay to avoid rate limits
+      if(i<count-1&&!state.batchStop)await sleep(1200);
+    }catch(e){
+      batchLog(`❌ 第 ${chNum} 章生成失败: ${e.message.slice(0,60)}`,'err');
+      toast('批量生成中断: '+e.message.slice(0,60),'error');
+      break;
+    }
+  }
+  batchLog(`🎉 批量完成，共生成 ${successCount} 章`,'ok');
+  state.batchStop=false;
+  if(btn){btn.textContent='⚡ 开始批量生成';btn.onclick=()=>generateBatch();btn.disabled=false;}
+  renderWritingPage();
+}
+
+async function buildChapterText(p,chNum){
+  const isOpening=chNum<=3;
+  const prevChaps=p.chapters?.slice(-3)||[];
+  const card=p.storyCard||{};
+
+  // Determine pacing hint based on chapter number
+  const outlineRef=p.outline?(p.outline.slice(0,600)):'';
+  const isBigSlapChapter=(chNum%10===0);
+  const isMediumSlapChapter=(chNum%5===0&&chNum%10!==0);
+  const pacingHint=isBigSlapChapter?'【⚡本章是大爽点章节！必须有重量级打脸/突破/震惊全场的高潮场面，读者等了10章了，要让他们爽翻】':
+    isMediumSlapChapter?'【本章是中型爽点章节，需要有一个明显的情绪高潮和爽感积累】':
+    '【本章稳步推进，设置悬念，为下一个爽点蓄力】';
+
+  const openingInstr=isOpening?`
+【开局特别要求 - 第${chNum}章】
+${p.openingStyle==='slap'?'开局打脸风格：直接展现主角被羞辱或低估，然后立即有反击或金手指觉醒，第一章要让读者立刻爽到':
+  p.openingStyle==='mystery'?'悬念钩子风格：埋下重大谜题，第一章结尾要有强烈悬念，让读者必须看下一章':
+  'AI智能开局：基于故事设定，选择最能抓住读者的开局方式，前三章是黄金留读时间'}
+第一章结尾必须有强烈悬念，第二章必须出现第一个明显爽点，第三章要让读者看到主角的潜力上限。`:'';
+
+  return await callAI([{role:'user',content:`你是专业番茄小说作者，正在创作爽文。
+
+【小说核心设定】
+书名：${p.settings.title} | 类型：${p.settings.genre}
+主角：${p.settings.protagonist_name}
+背景：${(p.settings.protagonist_bg||'').slice(0,80)}
+金手指：${(p.settings.protagonist_ability||'').slice(0,100)}
+核心爽点：${(p.settings.hook_points||'').slice(0,100)}
+情感基调：${p.settings.emotional_tone}
+写作风格：${p.settings.writing_style||''}
+禁忌内容：${p.settings.forbidden_content||'无'}
+
+【大纲参考（必须遵照）】
+${outlineRef}
+
+【故事状态卡（严格遵守，不能有矛盾）】
+已出场人物：${(card.characters||[]).join('、')||'无'}
+最近事件：${(card.events||[]).slice(-4).join('；')||'无'}
+当前伏笔：${(card.foreshadowing||[]).join('；')||'无'}
+情绪节点：${(card.emotionNodes||[]).slice(-2).join('；')||'无'}
+
+【前章摘要（保证剧情连贯）】
+${prevChaps.map((c,i)=>`第${chNum-prevChaps.length+i}章：${c.summary||c.text?.slice(0,100)}`).join('\n')||'（第一章，全新开始）'}
+
+${state.intervention?`【读者干预指令 - 必须执行】\n${state.intervention}`:''}
+${openingInstr}
+${pacingHint}
+
+【本章任务：第${chNum}章】
+字数要求：2400-2700字（必须达到）
+排版要求：
+- 短句为主（5-15字），情绪激烈处单句成段
+- 对话结束后空行，重要金句独立成段
+- 每隔3-4行有节奏变化，避免大段连续文字
+- 动作/冲突场面用碎片化短句制造紧张感
+
+内容要求：
+- 每500字必须有一个情绪推进或小爽点
+- 结尾必须有强钩子，让读者迫切想看下一章
+- 人物言行与设定和前文一致，绝对不能有姓名/设定矛盾
+- 对话口语化，有各人物独特的语言风格
+- 情绪靠情节和人物驱动，不要说教
+
+第一行输出章节标题，格式：第${chNum}章 [标题名]
+然后直接开始正文。`}],3500);
+}
+
 async function generateChapter(){
   const p=state.currentProject;
   if(!getApiKey()){toast('请先配置API Key','error');return;}
@@ -1149,60 +1347,10 @@ async function generateChapter(){
   renderWriteTab(document.getElementById('write-tab-content'));
 
   const chNum=(p.chapters?.length||0)+1;
-  const isOpening=chNum<=3;
-  const prevChaps=p.chapters?.slice(-3)||[];
-  const card=p.storyCard||{};
-
-  const openingInstr=isOpening?`
-【开局特别要求 - 第${chNum}章】
-${p.openingStyle==='slap'?'开局打脸风格：直接展现主角被羞辱或低估，然后立即有反击或金手指觉醒，第一章要让读者立刻爽到':
-  p.openingStyle==='mystery'?'悬念钩子风格：埋下重大谜题，第一章结尾要有强烈悬念，让读者必须看下一章':
-  'AI智能开局：基于故事设定，选择最能抓住读者的开局方式，前三章是黄金留读时间'}
-第一章结尾必须有强烈悬念，第二章必须出现第一个明显爽点，第三章要让读者看到主角的潜力上限。`:'';
 
   try{
-    const text=await callAI([{role:'user',content:`你是专业番茄小说作者，正在创作爽文。
-
-【小说核心设定】
-书名：${p.settings.title} | 类型：${p.settings.genre}
-主角：${p.settings.protagonist_name}
-背景：${(p.settings.protagonist_bg||'').slice(0,80)}
-金手指：${(p.settings.protagonist_ability||'').slice(0,100)}
-核心爽点：${(p.settings.hook_points||'').slice(0,100)}
-情感基调：${p.settings.emotional_tone}
-
-【故事状态卡（必须遵守）】
-已出场人物：${(card.characters||[]).join('、')||'无'}
-最近事件：${(card.events||[]).slice(-3).join('；')||'无'}
-当前伏笔：${(card.foreshadowing||[]).join('；')||'无'}
-
-【前章摘要】
-${prevChaps.map((c,i)=>`第${chNum-prevChaps.length+i}章：${c.summary||c.text?.slice(0,80)}`).join('\n')||'（第一章）'}
-
-${state.intervention?`【读者干预指令 - 必须执行】\n${state.intervention}`:''}
-${openingInstr}
-
-【本章任务：第${chNum}章】
-字数要求：2400-2600字
-排版要求：
-- 大量使用短句（5-15字为主），情绪激烈处单句成段
-- 对话结束后空行，重要金句独立成段
-- 不用大段连续文字，每隔3-4行要有节奏变化
-- 动作场面用碎片化短句制造紧张感
-
-内容要求：
-- 每500字必须有一个情绪推进或小爽点
-- 结尾必须有强钩子，让读者想看下一章
-- 人物性格言行与设定保持一致，不能前后矛盾
-- 对话自然口语化，有人物性格特色
-- 情绪张力靠情节和人物驱动，给读者充足带入感
-- 符合番茄小说内容规范
-
-第一行输出章节标题，格式：第${chNum}章 [标题名]
-然后直接开始正文。`}],3500);
-    
+    const text=await buildChapterText(p,chNum);
     state.currentChapterDraft=text;
-    // 自动更新故事卡
     updateStoryCard(text,chNum);
   }catch(e){
     toast('生成失败: '+e.message,'error');
