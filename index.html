@@ -312,6 +312,9 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 </div>
 
 <script>
+// HTML转义工具函数（避免模板字符串中的语法错误）
+function htmlEsc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function htmlUnesc(s){return String(s||'').replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>');}
 // ═══════════════════════════════════════════════
 // 数据层
 // ═══════════════════════════════════════════════
@@ -414,12 +417,16 @@ const WORD_TIERS = [
   {label:'标准',words:'100万字',val:1000000,chapters:400},
   {label:'长篇',words:'150万字',val:1500000,chapters:600},
   {label:'超长',words:'200万字',val:2000000,chapters:800},
+  {label:'超超长',words:'300万字',val:3000000,chapters:1200},
 ];
 
 const OPENING_STYLES = [
-  {id:'slap',name:'🥊 开局打脸',desc:'第一章直接爽点前置，展现被羞辱→立刻反击，让读者立即爽到'},
-  {id:'mystery',name:'🔮 悬念钩子',desc:'第一章埋下重大谜题或悬念，第二章揭秘引爆，让读者迫切想往下看'},
-  {id:'ai',name:'🤖 AI智能分析',desc:'AI根据你的故事设定，自动分析并选择最佳开局方式，量身定制'},
+  {id:'slap',    name:'🥊 开局打脸',   desc:'第一章直接被羞辱→立刻反击，读者第一章就爽到'},
+  {id:'mystery', name:'🔮 悬念钩子',   desc:'第一章埋大谜题，第二章揭秘引爆，吊足读者胃口'},
+  {id:'system',  name:'⚡ 系统觉醒',   desc:'开局获得系统/金手指，第一章就展示系统的强大'},
+  {id:'reborn',  name:'🔄 重生回溯',   desc:'带记忆重生，第一章就开始算账复仇布局'},
+  {id:'peak',    name:'👑 巅峰开局',   desc:'先展示极致高光，然后急转直下再逆袭'},
+  {id:'ai',      name:'🤖 AI智能分析', desc:'AI根据故事设定，自动选择最能抓住读者的开局'},
 ];
 
 const DEFAULT_FIELDS = [
@@ -442,8 +449,8 @@ const DEFAULT_FIELDS = [
   {k:'core_conflict',l:'核心矛盾',t:'textarea',p:'贯穿全书的主要矛盾冲突'},
   {k:'hook_points',l:'主要爽点设计',t:'textarea',p:'打脸、逆袭、复仇等关键爽点，越具体越好'},
   {k:'story_summary',l:'故事简介',t:'textarea',p:'200字以内的核心故事梗概，类似番茄简介'},
-  {k:'emotional_tone',l:'情感基调',t:'input',p:'如：热血、阴谋算计、温情暖心、黑化复仇'},
-  {k:'writing_style',l:'写作风格',t:'input',p:'如：爽快直接、暗黑系、轻松幽默、硬核热血'},
+  {k:'emotional_tone',l:'情感基调',t:'select',p:'热血热燃',options:['热血热燃','阴谋算计','温情暖心','黑化复仇','轻松幽默','悬疑惊悚','爽快直接','暗黑压抑','励志成长','爽中带甜']},
+  {k:'writing_style',l:'写作风格',t:'select',p:'番茄爽文标准',options:['番茄爽文标准','硬核热血','轻小说风','暗黑流','系统流','无敌爽文','慢热深情','爆笑喜剧','悬疑推理','玄幻史诗']},
   {k:'chapter_rhythm',l:'章节节奏规划',t:'textarea',p:'大致节奏：开篇-发展-高潮-结局各占多少章'},
   {k:'foreshadowing',l:'主要伏笔设计',t:'textarea',p:'预先设计好的伏笔，后期要回收的'},
   {k:'forbidden_content',l:'内容禁区',t:'textarea',p:'不希望出现的内容或情节，防止AI翻车'},
@@ -1104,10 +1111,10 @@ function renderOutlineStep(el){
           <span style="color:var(--muted);">▼</span>
         </div>
         <div id="ol-pre" style="padding:12px 14px;max-height:60vh;overflow-y:auto;">
-          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${p.outline.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(p.outline)}</pre>
         </div>
       </div>
-      <textarea id="outline-text" style="display:none;">${p.outline.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      <textarea id="outline-text" style="display:none;">${htmlEsc(p.outline)}</textarea>
       <button class="btn-primary" onclick="confirmOutline()">确认大纲，规划字数 →</button>`:''}
     </div>`;
 }
@@ -1169,87 +1176,80 @@ ${baseInfo}
 禁止写"后期更精彩"等空话，所有内容必须基于设定。`}],3000);
     outLog('✓ 第一部分完成','ok');
 
-    // 第二段：分卷大纲（每次生成一半卷数，避免截断）
-    const halfVol=Math.ceil(volCount/2);
-    outLog(`📋 生成第1-${halfVol}卷大纲...`);
-    const part2=await callAI([{role:'user',content:`你是资深番茄小说作者，生成小说分卷大纲（前半部分）。
+    // 每卷单独一次请求，彻底避免截断
+    const volParts=[];
+    let prevVolSummary=part1.slice(0,300);
+    for(let v=1;v<=volCount;v++){
+      const chStart=(v-1)*chPerVol+1;
+      const chEnd=v===volCount?totalCh:v*chPerVol;
+      const isLast=v===volCount;
+      outLog(`📖 生成第${v}卷（第${chStart}-${chEnd}章）...`);
+      const volText=await callAI([{role:'user',content:`你是资深番茄小说作者，只生成第${v}卷的详细大纲，不要生成其他卷。
 
 【创作设定】
 ${baseInfo}
 
-【已确定的关键节点】
-${part1.slice(0,400)}
+【已有大纲摘要（前文参考）】
+${prevVolSummary}
 
-【输出：第1卷到第${halfVol}卷的详细大纲】
-每卷格式：
-第X卷【卷名】（第X-X章）
-- 本卷核心任务：
-- 主要矛盾/对手：
-- 能力成长节点：（具体写出主角获得哪些能力/突破）
-- 大爽点节点：（3-5个，标明约第几章，具体描述场景）
-- 感情线进展：
-- 本卷结尾钩子：（具体悬念，引入下卷）
+【本次任务：第${v}卷（第${chStart}-${chEnd}章，共${chEnd-chStart+1}章）】
+严格按以下格式输出，只输出第${v}卷：
 
-所有内容基于设定，不允许引入新人物或能力。`}],2500);
-    outLog(`✓ 第1-${halfVol}卷完成`,'ok');
+第${v}卷【卷名】（第${chStart}-${chEnd}章）
 
-    // 第三段：后半卷
-    outLog(`📋 生成第${halfVol+1}-${volCount}卷大纲...`);
-    const part3=await callAI([{role:'user',content:`你是资深番茄小说作者，生成小说分卷大纲（后半部分）。
+■ 本卷核心任务：
+（主角这一卷要完成什么）
 
-【创作设定】
-${baseInfo}
+■ 主要矛盾/对手：
+（这一卷的核心敌对力量及其行动）
 
-【前半卷大纲参考】
-${part2.slice(0,400)}
+■ 能力成长节点：
+（具体列出主角在哪几章获得哪些能力/境界突破，标明章节）
 
-【输出：第${halfVol+1}卷到第${volCount}卷的详细大纲】
-每卷格式：
-第X卷【卷名】（第X-X章）
-- 本卷核心任务：
-- 主要矛盾/对手：
-- 能力成长节点：
-- 大爽点节点：（3-5个，标明约第几章，具体描述）
-- 感情线进展：
-- 本卷结尾钩子：
+■ 大爽点节点（至少4个，标明约第几章）：
+- 约第X章：（具体爽点场景描述）
+- 约第X章：（具体爽点场景描述）
+- 约第X章：（具体爽点场景描述）
+- 约第X章：（具体爽点场景描述）
 
-最后一卷必须包含结局设计：主角最终状态、反派结局、感情线结局。`}],2500);
-    outLog(`✓ 第${halfVol+1}-${volCount}卷完成`,'ok');
+■ 感情线进展：
+（感情线在这一卷如何推进，有哪些关键节点）
+
+■ 本卷结尾钩子：
+（具体悬念设置，如何引出下一卷）
+${isLast?`
+■ 结局设计（最终卷必填）：
+主角最终状态：
+反派结局：
+感情线结局：
+`:''}
+禁止写"后期更精彩"等空话。所有内容基于设定，不引入新设定外的人物或能力。`}],2000);
+      volParts.push({title:`📖 第${v}卷（第${chStart}-${chEnd}章）`,content:volText});
+      prevVolSummary=volText.slice(0,300);
+      outLog(`✓ 第${v}卷完成`,'ok');
+      if(v<volCount)await sleep(400);
+    }
     outLog('🎉 大纲全部生成完毕！','ok');
 
-    const fullOutline=`${part1}
-
-${'═'.repeat(30)}
-
-【分卷大纲·前半】
-${part2}
-
-${'═'.repeat(30)}
-
-【分卷大纲·后半】
-${part3}`;
+    const allSections=[{title:'📋 总体架构 & 前五章详情',content:part1},...volParts];
+    const sep='\n'+'═'.repeat(20)+'\n';
+    const fullOutline=allSections.map(s=>s.title+sep+s.content).join('\n\n');
     state.currentProject.outline=fullOutline;
 
-    // 把大纲按分隔符拆成三段，分别展示可折叠块
-    const sections=[
-      {title:'📋 总体架构 & 前五章详情',content:part1},
-      {title:'📖 分卷大纲（前半）',content:part2},
-      {title:'📖 分卷大纲（后半）',content:part3},
-    ];
-    const sectionHtml=sections.map((s,i)=>`
+    const sectionHtml=allSections.map((s,i)=>`
       <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
         <div onclick="toggleOutlineSection(${i})" style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer;background:var(--bg2);">
           <span style="color:var(--gold);font-size:13px;font-weight:700;">${s.title}</span>
           <span id="outline-arrow-${i}" style="color:var(--muted);font-size:14px;">▼</span>
         </div>
-        <div id="outline-sec-${i}" style="padding:12px 14px;display:block;">
-          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${s.content.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</pre>
+        <div id="outline-sec-${i}" style="padding:12px 14px;max-height:50vh;overflow-y:auto;display:block;">
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(s.content)}</pre>
         </div>
       </div>`).join('');
     outlineArea.innerHTML=`
-      <div style="color:var(--muted2);font-size:12px;margin-bottom:10px;">共三部分，点击标题可折叠。确认后可进入下一步。</div>
+      <div style="color:var(--muted2);font-size:12px;margin-bottom:10px;">共${allSections.length}个分区，点击标题可折叠/展开。</div>
       ${sectionHtml}
-      <textarea id="outline-text" style="display:none;">${fullOutline.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</textarea>
+      <textarea id="outline-text" style="display:none;">${htmlEsc(fullOutline)}</textarea>
       <button class="btn-primary" onclick="confirmOutline()" style="margin-top:4px;">确认大纲，规划字数 →</button>`;
   }catch(e){toast('生成失败: '+e.message,'error');}
   btn.textContent='🗂️ 重新生成大纲';btn.disabled=false;
@@ -1269,7 +1269,7 @@ function confirmOutline(){
   // 从 pre 标签重新拼合完整大纲
   let outline='';
   if(ta&&ta.value){
-    outline=ta.value.replace(/&lt;/g,'<').replace(/&gt;/g,'>');
+    outline=htmlUnesc(ta.value);
   } else {
     const pres=document.querySelectorAll('#outline-area pre');
     outline=Array.from(pres).map(p=>p.innerText).join('\n\n══════════════════════════════\n\n');
@@ -1991,7 +1991,7 @@ function showReaderModal(text,title){
         <button onclick="document.getElementById('reader-modal').remove()" style="background:transparent;border:none;color:#9898aa;font-size:22px;cursor:pointer;line-height:1;">×</button>
       </div>
     </div>
-    <div id="reader-text" style="flex:1;overflow-y:auto;padding:20px 18px;font-family:'Noto Serif SC',serif;font-size:15px;line-height:2;color:#e2e2e8;white-space:pre-wrap;word-break:break-all;">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+    <div id="reader-text" style="flex:1;overflow-y:auto;padding:20px 18px;font-family:'Noto Serif SC',serif;font-size:15px;line-height:2;color:#e2e2e8;white-space:pre-wrap;word-break:break-all;">${htmlEsc(text)}</div>
   `;
   document.body.appendChild(modal);
 }
