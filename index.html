@@ -19,8 +19,8 @@
   --muted2: #9898aa;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto Serif SC','Source Han Serif SC','SimSun',serif;overflow-x:hidden;}
-#app{min-height:100vh;position:relative;}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Noto Serif SC','Source Han Serif SC','SimSun',serif;overflow-x:hidden;overflow-y:auto;}
+#app{min-height:100vh;position:relative;height:auto;}
 
 /* 背景光晕 */
 .glow-orb{position:fixed;border-radius:50%;pointer-events:none;z-index:0;}
@@ -28,7 +28,7 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Noto S
 .glow-orb-2{width:500px;height:500px;bottom:-150px;left:-150px;background:radial-gradient(circle,rgba(232,64,64,.05) 0%,transparent 65%);}
 
 /* 屏幕容器 */
-.screen{display:none;max-width:500px;margin:0 auto;padding:16px 16px 100px;position:relative;z-index:1;}
+.screen{display:none;max-width:500px;margin:0 auto;padding:16px 16px 300px;position:relative;z-index:1;height:auto;}
 .screen.active{display:block;}
 
 /* Toast 通知 */
@@ -1110,12 +1110,13 @@ function renderOutlineStep(el){
           <span style="color:var(--gold);font-size:13px;font-weight:700;">📋 完整大纲（点击折叠/展开）</span>
           <span style="color:var(--muted);">▼</span>
         </div>
-        <div id="ol-pre" style="padding:12px 14px 40px 14px;">
-          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(p.outline)}</pre>
+        <div id="ol-pre" style="padding:12px 14px 20px 14px;">
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;word-wrap:break-word;font-family:inherit;margin:0;display:block;width:100%;">${htmlEsc(p.outline)}</pre>
         </div>
       </div>
       <textarea id="outline-text" style="display:none;">${htmlEsc(p.outline)}</textarea>
-      <button class="btn-primary" onclick="confirmOutline()">确认大纲，规划字数 →</button>`:''}
+      <div style="height:100px;"></div>
+      <button class="btn-primary" onclick="confirmOutline()" style="position:sticky;bottom:16px;box-shadow:0 -8px 24px rgba(0,0,0,0.8);">确认大纲，规划字数 →</button>`:''}
     </div>`;
 }
 
@@ -1296,21 +1297,21 @@ ${isLast?`■ 结局设计：
     state.currentProject.outline=fullOutline;
 
     const sectionHtml=allSections.map((s,i)=>`
-      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;">
-        <div onclick="toggleOutlineSection(${i})" style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer;background:var(--bg2);">
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;">
+        <div onclick="toggleOutlineSection(${i})" style="display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer;background:var(--bg2);border-radius:10px 10px 0 0;">
           <span style="color:var(--gold);font-size:13px;font-weight:700;">${s.title}</span>
           <span id="outline-arrow-${i}" style="color:var(--muted);font-size:14px;">▼</span>
         </div>
-        <div id="outline-sec-${i}" style="padding:12px 14px 40px 14px;display:block;">
-          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(s.content)}</pre>
+        <div id="outline-sec-${i}" style="padding:12px 14px 20px 14px;display:block;">
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;word-wrap:break-word;font-family:inherit;margin:0;display:block;width:100%;">${htmlEsc(s.content)}</pre>
         </div>
       </div>`).join('');
     outlineArea.innerHTML=`
       <div style="color:var(--muted2);font-size:12px;margin-bottom:10px;">共${allSections.length}个分区，点击标题可折叠/展开。</div>
       ${sectionHtml}
       <textarea id="outline-text" style="display:none;">${htmlEsc(fullOutline)}</textarea>
-      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:4px;">确认大纲，规划字数 →</button>
-      <div style="height:60px;"></div>`;
+      <div style="height:100px;"></div>
+      <button class="btn-primary" onclick="confirmOutline()" style="position:sticky;bottom:16px;margin-top:4px;box-shadow:0 -8px 24px rgba(0,0,0,0.8);">确认大纲，规划字数 →</button>`;
   }catch(e){toast('生成失败: '+e.message,'error');}
   btn.textContent='🗂️ 重新生成大纲';btn.disabled=false;
 }
