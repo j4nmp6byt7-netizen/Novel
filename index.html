@@ -1176,45 +1176,34 @@ ${baseInfo}
 禁止写"后期更精彩"等空话，所有内容必须基于设定。`}],3000);
     outLog('✓ 第一部分完成','ok');
 
-    // 每卷单独一次请求，最后一卷拆成上下两部分确保完整
+    // 新策略：自动续写直到完整，按自然段落拆分折叠块
     const volParts=[];
     let prevVolSummary=part1.slice(0,300);
 
-    async function genVolHalf(v,chStart,chEnd,isLast,part,prevSummary){
-      const halfMid=Math.floor((chStart+chEnd)/2);
-      const isPart1=part===1;
-      const rangeStart=isPart1?chStart:halfMid+1;
-      const rangeEnd=isPart1?halfMid:chEnd;
-      return await callAI([{role:'user',content:`你是资深番茄小说作者，只生成第${v}卷${isPart1?'上半部分':'下半部分'}的详细大纲。
+    // 检测文本是否被截断（最后一行不以标点结尾）
+    function isTruncated(text){
+      const t=text.trimEnd();
+      const lastChar=t[t.length-1];
+      // 完整结尾应该是标点或换行后的完整段落
+      return !['。','！','？','…','」','』','.','!','?','"'].includes(lastChar);
+    }
 
-【创作设定】
-${baseInfo}
-
-【前文参考】${prevSummary}
-
-【任务：第${v}卷${isPart1?'上':'下'}半（第${rangeStart}-${rangeEnd}章，共${rangeEnd-rangeStart+1}章）】
-
-■ 章节详细节点（第${rangeStart}-${rangeEnd}章）：
-按每5-10章一个节点，列出具体事件、爽点、能力成长：
-- 第${rangeStart}-${rangeStart+Math.floor((rangeEnd-rangeStart)/4)}章：
-- 第X-X章：
-- 第X-X章：
-- 第X-${rangeEnd}章：
-
-■ 大爽点节点（至少3个，标明约第几章，具体场景）：
-- 约第X章：
-- 约第X章：
-- 约第X章：
-
-■ 感情线（${rangeStart}-${rangeEnd}章段）：
-
-${isPart1?`■ 上半结尾悬念（引出下半）：`:`■ 本卷结尾钩子（引出下卷）：`}
-
-${isLast&&!isPart1?`■ 结局设计（必填）：
-主角最终状态：
-反派结局：
-感情线结局：`:''}
-不写空话，内容必须具体可执行。`}],2000);
+    // 生成一个片段，如果截断自动续写，最多续写2次
+    async function genWithContinue(prompt,maxTokens,logPrefix){
+      let result=await callAI([{role:'user',content:prompt}],maxTokens);
+      let tries=0;
+      while(isTruncated(result)&&tries<2){
+        tries++;
+        outLog(`${logPrefix} 检测到截断，续写第${tries}次...`,'warn');
+        const cont=await callAI([
+          {role:'user',content:prompt},
+          {role:'assistant',content:result},
+          {role:'user',content:'内容被截断了，请从刚才截断的地方继续往下写，直到本节内容完整结束。不要重复已有内容，直接续写。'}
+        ],1500);
+        result=result+cont;
+        await sleep(300);
+      }
+      return result;
     }
 
     for(let v=1;v<=volCount;v++){
@@ -1222,46 +1211,82 @@ ${isLast&&!isPart1?`■ 结局设计（必填）：
       const chEnd=v===volCount?totalCh:v*chPerVol;
       const isLast=v===volCount;
       const chCount=chEnd-chStart+1;
+      const halfMid=Math.floor((chStart+chEnd)/2);
 
-      if(chCount>80){
-        // 章节多的卷拆成上下两个折叠块
-        outLog(`📖 生成第${v}卷上半（第${chStart}-${Math.floor((chStart+chEnd)/2)}章）...`);
-        const volText1=await genVolHalf(v,chStart,chEnd,isLast,1,prevVolSummary);
-        const halfMid=Math.floor((chStart+chEnd)/2);
-        volParts.push({title:`📖 第${v}卷上（第${chStart}-${halfMid}章）`,content:volText1});
-        outLog(`✓ 第${v}卷上半完成`,'ok');
-        await sleep(400);
+      // 每卷固定拆上下两部分，每部分约50章，确保不超token
+      outLog(`📖 生成第${v}卷上（第${chStart}-${halfMid}章）...`);
+      const text1=await genWithContinue(
+        `你是资深番茄小说作者，生成第${v}卷上半（第${chStart}-${halfMid}章）的详细大纲。
 
-        outLog(`📖 生成第${v}卷下半（第${halfMid+1}-${chEnd}章）...`);
-        const volText2=await genVolHalf(v,chStart,chEnd,isLast,2,volText1.slice(0,300));
-        volParts.push({title:`📖 第${v}卷下（第${halfMid+1}-${chEnd}章）`,content:volText2});
-        prevVolSummary=volText2.slice(0,300);
-        outLog(`✓ 第${v}卷下半完成`,'ok');
-      } else {
-        // 章节少的卷一次生成
-        outLog(`📖 生成第${v}卷（第${chStart}-${chEnd}章）...`);
-        const volText=await callAI([{role:'user',content:`你是资深番茄小说作者，只生成第${v}卷的详细大纲。
+【设定】${baseInfo}
+【前文】${prevVolSummary}
 
-【创作设定】
-${baseInfo}
+输出格式（严格按此，内容要具体）：
 
-【前文参考】${prevVolSummary}
+第${v}卷上（第${chStart}-${halfMid}章）
 
-【第${v}卷（第${chStart}-${chEnd}章，共${chCount}章）】
+■ 本段核心任务：
 
-■ 本卷核心任务：
-■ 主要矛盾/对手：
-■ 能力成长节点（具体章节）：
-■ 大爽点节点（至少4个，标明章节，具体场景）：
-■ 感情线进展：
-■ 本卷结尾钩子：
-${isLast?'■ 结局设计：主角最终状态 / 反派结局 / 感情线结局：':''}
-不写空话，内容具体可执行。`}],2000);
-        volParts.push({title:`📖 第${v}卷（第${chStart}-${chEnd}章）`,content:volText});
-        prevVolSummary=volText.slice(0,300);
-        outLog(`✓ 第${v}卷完成`,'ok');
-      }
-      if(v<volCount)await sleep(400);
+■ 能力成长（标明具体章节）：
+
+■ 大爽点（每个标明章节，描述具体场景，至少3个）：
+- 约第X章：
+- 约第X章：
+- 约第X章：
+
+■ 感情线推进：
+
+■ 章节详情（每10章一个节点）：
+- 第${chStart}-${chStart+9}章：
+- 第X-X章：
+
+■ 段落结尾悬念：
+
+所有内容具体可执行，不写空话，必须写到"■ 段落结尾悬念："为止。`,
+        1800, `第${v}卷上`
+      );
+      volParts.push({title:`📖 第${v}卷上（第${chStart}-${halfMid}章）`,content:text1});
+      outLog(`✓ 第${v}卷上完成`,'ok');
+      await sleep(500);
+
+      outLog(`📖 生成第${v}卷下（第${halfMid+1}-${chEnd}章）...`);
+      const text2=await genWithContinue(
+        `你是资深番茄小说作者，生成第${v}卷下半（第${halfMid+1}-${chEnd}章）的详细大纲。
+
+【设定】${baseInfo}
+【上半参考】${text1.slice(-300)}
+
+输出格式（严格按此，内容要具体）：
+
+第${v}卷下（第${halfMid+1}-${chEnd}章）
+
+■ 本段核心任务：
+
+■ 能力成长（标明具体章节）：
+
+■ 大爽点（每个标明章节，描述具体场景，至少3个）：
+- 约第X章：
+- 约第X章：
+- 约第X章：
+
+■ 感情线推进：
+
+■ 章节详情（每10章一个节点）：
+- 第${halfMid+1}-${halfMid+10}章：
+- 第X-X章：
+
+${isLast?`■ 结局设计：
+主角最终状态：
+反派结局：
+感情线结局：`:`■ 段落结尾悬念（引出下卷）：`}
+
+所有内容具体可执行，不写空话，必须写到最后一个"■"标题的内容为止。`,
+        1800, `第${v}卷下`
+      );
+      volParts.push({title:`📖 第${v}卷下（第${halfMid+1}-${chEnd}章）`,content:text2});
+      prevVolSummary=text2.slice(-300);
+      outLog(`✓ 第${v}卷下完成`,'ok');
+      if(v<volCount)await sleep(500);
     }
     outLog('🎉 大纲全部生成完毕！','ok');
 
