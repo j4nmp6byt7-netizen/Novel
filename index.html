@@ -1111,7 +1111,7 @@ function renderOutlineStep(el){
           <span style="color:var(--muted);">▼</span>
         </div>
         <div id="ol-pre" style="padding:12px 14px 20px 14px;">
-          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;word-wrap:break-word;font-family:inherit;margin:0;display:block;width:100%;">${htmlEsc(p.outline)}</pre>
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(p.outline)}</pre>
         </div>
       </div>
       <textarea id="outline-text" style="display:none;">${htmlEsc(p.outline)}</textarea>
@@ -1177,117 +1177,52 @@ ${baseInfo}
 禁止写"后期更精彩"等空话，所有内容必须基于设定。`}],3000);
     outLog('✓ 第一部分完成','ok');
 
-    // 新策略：自动续写直到完整，按自然段落拆分折叠块
+    // 每卷单独一次请求，API直接完整输出，不做任何干预
     const volParts=[];
     let prevVolSummary=part1.slice(0,300);
-
-    // 检测文本是否被截断（最后一行不以标点结尾）
-    function isTruncated(text){
-      const t=text.trimEnd();
-      const lastChar=t[t.length-1];
-      // 完整结尾应该是标点或换行后的完整段落
-      return !['。','！','？','…','」','』','.','!','?','"'].includes(lastChar);
-    }
-
-    // 生成一个片段，如果截断自动续写，最多续写2次
-    async function genWithContinue(prompt,maxTokens,logPrefix){
-      let result=await callAI([{role:'user',content:prompt}],maxTokens);
-      let tries=0;
-      while(isTruncated(result)&&tries<2){
-        tries++;
-        outLog(`${logPrefix} 检测到截断，续写第${tries}次...`,'warn');
-        const cont=await callAI([
-          {role:'user',content:prompt},
-          {role:'assistant',content:result},
-          {role:'user',content:'内容被截断了，请从刚才截断的地方继续往下写，直到本节内容完整结束。不要重复已有内容，直接续写。'}
-        ],1500);
-        result=result+cont;
-        await sleep(300);
-      }
-      return result;
-    }
 
     for(let v=1;v<=volCount;v++){
       const chStart=(v-1)*chPerVol+1;
       const chEnd=v===volCount?totalCh:v*chPerVol;
       const isLast=v===volCount;
-      const chCount=chEnd-chStart+1;
       const halfMid=Math.floor((chStart+chEnd)/2);
 
-      // 每卷固定拆上下两部分，每部分约50章，确保不超token
+      // 上半卷
       outLog(`📖 生成第${v}卷上（第${chStart}-${halfMid}章）...`);
-      const text1=await genWithContinue(
-        `你是资深番茄小说作者，生成第${v}卷上半（第${chStart}-${halfMid}章）的详细大纲。
+      const text1=await callAI([{role:'user',content:`你是资深番茄小说作者，生成第${v}卷上半（第${chStart}-${halfMid}章）的详细大纲。
 
 【设定】${baseInfo}
-【前文】${prevVolSummary}
-
-输出格式（严格按此，内容要具体）：
+【前文参考】${prevVolSummary}
 
 第${v}卷上（第${chStart}-${halfMid}章）
-
 ■ 本段核心任务：
-
-■ 能力成长（标明具体章节）：
-
-■ 大爽点（每个标明章节，描述具体场景，至少3个）：
-- 约第X章：
-- 约第X章：
-- 约第X章：
-
+■ 能力成长（标明章节）：
+■ 大爽点（至少3个，标明章节，描述场景）：
 ■ 感情线推进：
-
-■ 章节详情（每10章一个节点）：
-- 第${chStart}-${chStart+9}章：
-- 第X-X章：
-
-■ 段落结尾悬念：
-
-所有内容具体可执行，不写空话，必须写到"■ 段落结尾悬念："为止。`,
-        1800, `第${v}卷上`
-      );
+■ 章节详情（每10章一节点）：
+■ 段落结尾悬念：`}],4000);
       volParts.push({title:`📖 第${v}卷上（第${chStart}-${halfMid}章）`,content:text1});
       outLog(`✓ 第${v}卷上完成`,'ok');
-      await sleep(500);
+      await sleep(300);
 
+      // 下半卷
       outLog(`📖 生成第${v}卷下（第${halfMid+1}-${chEnd}章）...`);
-      const text2=await genWithContinue(
-        `你是资深番茄小说作者，生成第${v}卷下半（第${halfMid+1}-${chEnd}章）的详细大纲。
+      const text2=await callAI([{role:'user',content:`你是资深番茄小说作者，生成第${v}卷下半（第${halfMid+1}-${chEnd}章）的详细大纲。
 
 【设定】${baseInfo}
-【上半参考】${text1.slice(-300)}
-
-输出格式（严格按此，内容要具体）：
+【上半参考】${text1.slice(-200)}
 
 第${v}卷下（第${halfMid+1}-${chEnd}章）
-
 ■ 本段核心任务：
-
-■ 能力成长（标明具体章节）：
-
-■ 大爽点（每个标明章节，描述具体场景，至少3个）：
-- 约第X章：
-- 约第X章：
-- 约第X章：
-
+■ 能力成长（标明章节）：
+■ 大爽点（至少3个，标明章节，描述场景）：
 ■ 感情线推进：
-
-■ 章节详情（每10章一个节点）：
-- 第${halfMid+1}-${halfMid+10}章：
-- 第X-X章：
-
-${isLast?`■ 结局设计：
-主角最终状态：
-反派结局：
-感情线结局：`:`■ 段落结尾悬念（引出下卷）：`}
-
-所有内容具体可执行，不写空话，必须写到最后一个"■"标题的内容为止。`,
-        1800, `第${v}卷下`
-      );
+■ 章节详情（每10章一节点）：
+${isLast?'■ 结局设计（主角/反派/感情线）：':'■ 段落结尾悬念（引出下卷）：'}`}],4000);
       volParts.push({title:`📖 第${v}卷下（第${halfMid+1}-${chEnd}章）`,content:text2});
-      prevVolSummary=text2.slice(-300);
+      prevVolSummary=text2.slice(-200);
       outLog(`✓ 第${v}卷下完成`,'ok');
-      if(v<volCount)await sleep(500);
+      if(v<volCount)await sleep(300);
     }
     outLog('🎉 大纲全部生成完毕！','ok');
 
@@ -1303,7 +1238,7 @@ ${isLast?`■ 结局设计：
           <span id="outline-arrow-${i}" style="color:var(--muted);font-size:14px;">▼</span>
         </div>
         <div id="outline-sec-${i}" style="padding:12px 14px 20px 14px;display:block;">
-          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;word-wrap:break-word;font-family:inherit;margin:0;display:block;width:100%;">${htmlEsc(s.content)}</pre>
+          <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(s.content)}</pre>
         </div>
       </div>`).join('');
     outlineArea.innerHTML=`
