@@ -1110,7 +1110,7 @@ function renderOutlineStep(el){
           <span style="color:var(--gold);font-size:13px;font-weight:700;">📋 完整大纲（点击折叠/展开）</span>
           <span style="color:var(--muted);">▼</span>
         </div>
-        <div id="ol-pre" style="padding:12px 14px;">
+        <div id="ol-pre" style="padding:12px 14px 40px 14px;">
           <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(p.outline)}</pre>
         </div>
       </div>
@@ -1242,7 +1242,7 @@ ${isLast?`
           <span style="color:var(--gold);font-size:13px;font-weight:700;">${s.title}</span>
           <span id="outline-arrow-${i}" style="color:var(--muted);font-size:14px;">▼</span>
         </div>
-        <div id="outline-sec-${i}" style="padding:12px 14px;display:block;">
+        <div id="outline-sec-${i}" style="padding:12px 14px 40px 14px;display:block;">
           <pre style="color:#d1d1d8;font-size:12px;line-height:1.8;white-space:pre-wrap;word-break:break-all;font-family:inherit;margin:0;">${htmlEsc(s.content)}</pre>
         </div>
       </div>`).join('');
@@ -1250,7 +1250,8 @@ ${isLast?`
       <div style="color:var(--muted2);font-size:12px;margin-bottom:10px;">共${allSections.length}个分区，点击标题可折叠/展开。</div>
       ${sectionHtml}
       <textarea id="outline-text" style="display:none;">${htmlEsc(fullOutline)}</textarea>
-      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:4px;">确认大纲，规划字数 →</button>`;
+      <button class="btn-primary" onclick="confirmOutline()" style="margin-top:4px;">确认大纲，规划字数 →</button>
+      <div style="height:60px;"></div>`;
   }catch(e){toast('生成失败: '+e.message,'error');}
   btn.textContent='🗂️ 重新生成大纲';btn.disabled=false;
 }
