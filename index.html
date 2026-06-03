@@ -812,27 +812,109 @@ function advanceStep(data={}){
   renderCreatePage();
 }
 
-// Step 1 创意
+// ══ 番茄男频完整标签体系 ══
+const TOMATO_TAGS = {
+  '热门标签': ['玄幻','都市','修仙','悬疑','历史','科幻末世','奇幻仙侠','种田','灾难','网游','多女主','末世','反派','无脑爽','无敌','系统','升级流','搞笑轻松','求生','开局','异能','穿越'],
+  '主题': ['都市高武','都市脑洞','东方玄幻','玄幻脑洞','东方仙侠','都市日常','悬疑脑洞','都市异能','都市生活','第四天灾','悬疑灵异','高武世界','灵气复苏','天灾','历史脑洞','男频衍生','规则怪谈','武侠','体育','综漫','历史古代','都市种田','轻小说','古代','异世大陆','星际','赛博朋克','洪荒流','诸天万界'],
+  '角色': ['赘婿','战神','学霸','神医','鉴宝','驭兽','炼丹','阵法','剑修','体修','召唤师','影帝','首富','兵王','特种兵','龙傲天','废材逆袭','天才少年','隐世高手','布衣崛起'],
+  '情节': ['打脸爽文','装逼打脸','逆袭复仇','重生回档','穿越异界','天降系统','觉醒血脉','签到领奖','无限流','副本闯关','大佬隐退','退婚逆袭','豪门恩怨','商战风云','都市争霸','宗门争霸','宗门传承','斗破苍穹流','修炼速度','背景深厚'],
+  '爽点': ['一拳超人','无敌流','碾压','吊打','秒杀','神级装备','天道宠儿','运气爆棚','美女环绕','财富自由','一夜暴富','隐藏实力','震惊所有人','打脸打脸','被低估后反杀'],
+  '世界观': ['末世废土','星际联盟','修真界','武道世界','神话世界','现代都市','古代架空','未来科技','平行世界','洪荒时代','次元融合','游戏世界','副本世界'],
+};
+
+// 当前选中的标签
+if(!state.selectedTags)state.selectedTags=[];
+
 function renderIdeaStep(el){
   const p=state.currentProject;
+  if(!state.selectedTags)state.selectedTags=[];
+
+  const tagGroupsHtml=Object.entries(TOMATO_TAGS).map(([group,tags])=>`
+    <div style="margin-bottom:14px;">
+      <div style="color:var(--muted2);font-size:11px;font-weight:700;letter-spacing:1px;margin-bottom:7px;">${group}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;">
+        ${tags.map(tag=>`
+          <span onclick="toggleTag('${tag}')" id="tag-${tag.replace(/[^a-zA-Z0-9一-龥]/g,'')}"
+            style="display:inline-block;padding:5px 11px;border-radius:20px;font-size:12px;cursor:pointer;transition:all .2s;
+            border:1px solid ${state.selectedTags.includes(tag)?'var(--gold)':'var(--border)'};
+            background:${state.selectedTags.includes(tag)?'rgba(240,165,0,0.15)':'var(--bg3)'};
+            color:${state.selectedTags.includes(tag)?'var(--gold)':'var(--muted2)'};"
+          >${tag}</span>`).join('')}
+      </div>
+    </div>`).join('');
+
   el.innerHTML=`
-    <div class="step-title">💡 输入你的创意</div>
-    <div class="step-desc">用一句话描述你想写的故事，AI将自动分析类型、爽点和方向</div>
-    <textarea class="textarea" id="idea-input" style="min-height:110px;" placeholder="例如：一个被退婚的废柴少爷，意外觉醒了神秘体质，开始了都市逆袭之路">${p.idea||''}</textarea>
-    <button class="btn-primary" onclick="analyzeIdea()" style="margin-top:8px;">🔍 AI智能分析创意</button>
+    <div class="step-title">💡 选择标签 + 输入创意</div>
+    <div class="step-desc">选择最多10个标签定义你的故事类型，再补充一句话描述（可选）</div>
+
+    <div id="tag-selected-bar" style="min-height:36px;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:7px 10px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+      ${state.selectedTags.length?state.selectedTags.map(t=>`
+        <span style="background:var(--gold);color:#000;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:700;">
+          ${t} <span onclick="toggleTag('${t}')" style="cursor:pointer;margin-left:3px;">✕</span>
+        </span>`).join('')
+        :'<span style="color:var(--muted);font-size:12px;">还没选标签，最多可选10个</span>'}
+    </div>
+
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px;max-height:340px;overflow-y:auto;">
+      ${tagGroupsHtml}
+    </div>
+
+    <div style="margin-bottom:8px;">
+      <label style="color:var(--muted2);font-size:12px;font-weight:700;display:block;margin-bottom:5px;">补充描述（可选）</label>
+      <textarea class="textarea" id="idea-input" style="min-height:80px;" placeholder="例如：主角被退婚后觉醒系统，开始了逆袭之路（不填也可以直接分析）">${p.idea||''}</textarea>
+    </div>
+
+    <button class="btn-primary" onclick="analyzeIdea()">🔍 AI智能分析创意</button>
     <div id="idea-result"></div>`;
+
   if(p.aiIdeaAnalysis){renderIdeaResult(p.aiIdeaAnalysis);}
 }
 
+function toggleTag(tag){
+  if(!state.selectedTags)state.selectedTags=[];
+  const idx=state.selectedTags.indexOf(tag);
+  if(idx>=0){
+    state.selectedTags.splice(idx,1);
+  } else {
+    if(state.selectedTags.length>=10){toast('最多选10个标签','error');return;}
+    state.selectedTags.push(tag);
+  }
+  // 只更新选中栏和标签样式，不重渲整页
+  const bar=document.getElementById('tag-selected-bar');
+  if(bar){
+    bar.innerHTML=state.selectedTags.length?state.selectedTags.map(t=>`
+      <span style="background:var(--gold);color:#000;border-radius:14px;padding:3px 10px;font-size:12px;font-weight:700;">
+        ${t} <span onclick="toggleTag('${t}')" style="cursor:pointer;margin-left:3px;">✕</span>
+      </span>`).join('')
+      :'<span style="color:var(--muted);font-size:12px;">还没选标签，最多可选10个</span>';
+  }
+  // 更新被点击标签的样式
+  const safeId=tag.replace(/[^a-zA-Z0-9一-龥]/g,'');
+  const tagEl=document.getElementById('tag-'+safeId);
+  if(tagEl){
+    const sel=state.selectedTags.includes(tag);
+    tagEl.style.border=sel?'1px solid var(--gold)':'1px solid var(--border)';
+    tagEl.style.background=sel?'rgba(240,165,0,0.15)':'var(--bg3)';
+    tagEl.style.color=sel?'var(--gold)':'var(--muted2)';
+  }
+}
+
 async function analyzeIdea(){
-  const idea=document.getElementById('idea-input').value.trim();
-  if(!idea){toast('请输入你的创意','error');return;}
-  state.currentProject.idea=idea;
-  document.querySelector('[onclick="analyzeIdea()"]').textContent='🤔 分析中...';
+  const extraIdea=document.getElementById('idea-input')?.value.trim()||'';
+  const tags=state.selectedTags||[];
+  if(!tags.length&&!extraIdea){toast('请至少选择一个标签或输入创意','error');return;}
+
+  const ideaCombined=tags.length?`标签：${tags.join('、')}${extraIdea?'；补充：'+extraIdea:''}`
+    :extraIdea;
+
+  state.currentProject.idea=ideaCombined;
+  const btn=document.querySelector('[onclick="analyzeIdea()"]');
+  if(btn){btn.textContent='🤔 分析中...';btn.disabled=true;}
   try{
-    const res=await callAI([{role:'user',content:`你是资深番茄小说编辑。用户创意：「${idea}」
+    const res=await callAI([{role:'user',content:`你是资深番茄小说编辑。用户选择的创作方向：「${ideaCombined}」
+
 请分析并输出：
-1. 最适合的爽文类型（都市/修仙/重生/系统流等）
+1. 最适合的爽文细分类型
 2. 核心爽点类型（打脸/逆袭/复仇/装逼等）
 3. 目标读者群体特征
 4. 同类爆款关键词（3-5个，用于后续拆书）
@@ -843,17 +925,27 @@ async function analyzeIdea(){
     state.currentProject.aiIdeaAnalysis=res;
     renderIdeaResult(res);
   }catch(e){toast('分析失败: '+e.message,'error');}
-  const btn=document.querySelector('[onclick="analyzeIdea()"]');
-  if(btn)btn.textContent='🔍 AI智能分析创意';
+  if(btn){btn.textContent='🔍 AI智能分析创意';btn.disabled=false;}
 }
 
 function renderIdeaResult(res){
-  document.getElementById('idea-result').innerHTML=`
+  const el=document.getElementById('idea-result');
+  if(!el)return;
+  el.innerHTML=`
     <div class="analysis-box" style="margin-top:12px;">
       <div class="analysis-title">🎯 AI分析结果</div>
       <div class="analysis-content">${res}</div>
-      <button class="btn-primary" onclick="advanceStep({idea:document.getElementById('idea-input').value,aiIdeaAnalysis:'${encodeURIComponent(res)}'})" style="margin-top:12px;">确认，进入拆书分析 →</button>
+      <button class="btn-primary" onclick="confirmIdea()" style="margin-top:12px;">确认，进入拆书分析 →</button>
     </div>`;
+}
+
+function confirmIdea(){
+  const extraIdea=document.getElementById('idea-input')?.value.trim()||'';
+  const tags=state.selectedTags||[];
+  const idea=tags.length?`标签：${tags.join('、')}${extraIdea?'；'+extraIdea:''}`
+    :extraIdea;
+  const res=state.currentProject.aiIdeaAnalysis||'';
+  advanceStep({idea,aiIdeaAnalysis:res});
 }
 
 // Step 2 拆书
@@ -1453,60 +1545,106 @@ async function quickScore(text){
 }
 
 async function generateBatch(){
-  const count=20;// 固定20章
+  // 读取用户选择的章节数，默认20
+  const selectEl=document.getElementById('batch-count-select');
+  const count=selectEl?parseInt(selectEl.value)||20:20;
+
+  // 不重新渲染页面，直接操作DOM元素
   const logEl=document.getElementById('batch-log');
   const btn=document.getElementById('batch-btn');
-  if(btn){btn.textContent='⏹ 中断';btn.onclick=()=>{state.batchStop=true;btn.textContent='中断中...';btn.disabled=true;};}
+  const headerEl=document.getElementById('batch-header');
+
+  if(btn){
+    btn.textContent='⏹ 中断生成';
+    btn.onclick=()=>{
+      state.batchStop=true;
+      btn.textContent='中断中...';
+      btn.disabled=true;
+    };
+  }
   state.batchStop=false;
 
   function batchLog(msg,cls=''){
-    if(!logEl)return;
-    logEl.innerHTML+=`<div class="log-item ${cls}" style="margin-bottom:3px;">${msg}</div>`;
-    logEl.scrollTop=logEl.scrollHeight;
+    // 每次都重新获取logEl，防止DOM更新导致引用失效
+    const el=document.getElementById('batch-log');
+    if(!el)return;
+    el.innerHTML+=`<div class="log-item ${cls}" style="margin-bottom:3px;">${msg}</div>`;
+    el.scrollTop=el.scrollHeight;
   }
 
+  function updateHeader(chNum,done,total){
+    const el=document.getElementById('batch-header');
+    if(el)el.textContent=`⚡ 批量生成中：第${chNum}章（${done}/${total}）`;
+    // 只更新顶部进度信息，不重渲整个页面
+    const progEl=document.getElementById('writing-progress');
+    if(progEl){
+      const p=state.currentProject;
+      const totalCh=p.wordTier?.chapters||400;
+      const doneCh=p.chapters?.length||0;
+      const pct=Math.round(doneCh/totalCh*100);
+      progEl.textContent=`第${doneCh+1}章 / 共${totalCh}章 · ${pct}% · 约${(doneCh*2500/10000).toFixed(1)}万字`;
+      const bar=document.getElementById('writing-prog-bar');
+      if(bar)bar.style.width=pct+'%';
+    }
+  }
+
+  if(logEl)logEl.innerHTML='';
   const startCh=(state.currentProject.chapters?.length||0)+1;
-  batchLog(`🚀 开始批量生成第${startCh}-${startCh+count-1}章，屏幕请保持亮着`,'warn');
+  batchLog(`🚀 开始批量生成第${startCh}章起共${count}章，屏幕请保持亮着不切屏`,'warn');
   let successCount=0;
 
   for(let i=0;i<count;i++){
     if(state.batchStop){batchLog('⏹ 已中断','warn');break;}
     const p=state.currentProject;
     const chNum=(p.chapters?.length||0)+1;
+    updateHeader(chNum,i,count);
     batchLog(`📝 第${chNum}章 生成中...`);
+
     try{
       let text=await buildChapterText(p,chNum);
 
-      // 快速评分，低于B级自动重生成一次
+      // 快速评分，C级自动重生成一次
       const scoreResult=await quickScore(text);
       if(scoreResult.grade==='C'){
-        batchLog(`⚠️ 第${chNum}章评分${scoreResult.grade}(${scoreResult.score}分)，自动重生成...`,'warn');
+        batchLog(`⚠️ 第${chNum}章评分C(${scoreResult.score}分)，自动重生成...`,'warn');
         text=await buildChapterText(p,chNum);
       }
 
-      // 保存
+      // 保存章节（直接操作state，不触发UI重渲）
       if(!p.history)p.history=[];
       p.history.push({ver:p.history.length+1,time:Date.now(),chapterNum:chNum,text,desc:`第${chNum}章（批量）`});
       const chData={num:chNum,text,summary:text.slice(0,120),createdAt:Date.now(),score:scoreResult.score,grade:scoreResult.grade==='C'?'B':scoreResult.grade};
       p.chapters=[...(p.chapters||[]),chData];
       saveProject(p);
-      // 异步更新故事卡，不阻塞生成流程
-      updateStoryCard(text,chNum).catch(e=>console.log('故事卡更新失败',e));
+
+      // 异步更新故事卡，不阻塞
+      updateStoryCard(text,chNum).catch(()=>{});
       successCount++;
       const wl=text.length;
-      batchLog(`✅ 第${chNum}章完成 ${wl}字 ${chData.grade}${chData.score}分${wl<2400?'⚠️偏少':''}${wl>3100?'↑偏多':''}（${i+1}/${count}）`,'ok');
-      renderWritingPage();
-      if(i<count-1&&!state.batchStop)await sleep(800);
+      const gradeColor=chData.grade==='S'?'color:#ffd700':chData.grade==='A'?'color:#22c55e':'color:#f0a500';
+      batchLog(`✅ 第${chNum}章 ${wl}字 <span style="${gradeColor};font-weight:700;">${chData.grade}${chData.score}分</span>${wl<2400?' ⚠️偏少':''}（${i+1}/${count}）`,'ok');
+
+      // 只更新进度条和标题，不重渲整页
+      updateHeader(chNum+1,i+1,count);
+
+      if(i<count-1&&!state.batchStop)await sleep(600);
     }catch(e){
       batchLog(`❌ 第${chNum}章失败: ${e.message.slice(0,50)}`,'err');
       toast('生成中断: '+e.message.slice(0,40),'error');
       break;
     }
   }
-  const endCh=(state.currentProject.chapters?.length||0);
+
+  const endCh=state.currentProject.chapters?.length||0;
   batchLog(`🎉 完成！共生成${successCount}章（第${startCh}-${endCh}章）`,'ok');
   state.batchStop=false;
-  if(btn){btn.textContent='⚡ 批量生成20章';btn.onclick=()=>generateBatch();btn.disabled=false;}
+  if(btn){
+    btn.textContent='⚡ 批量生成';
+    btn.onclick=()=>generateBatch();
+    btn.disabled=false;
+  }
+  if(headerEl)headerEl.textContent='⚡ 批量生成正文';
+  // 全部完成后才整体刷新一次
   renderWritingPage();
 }
 
