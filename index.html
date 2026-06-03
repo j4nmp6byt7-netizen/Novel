@@ -1397,7 +1397,7 @@ function renderWriteTab(el){
           <span style="color:var(--muted2);font-size:13px;">章</span>
         </div>
         <div style="color:var(--muted);font-size:11px;margin-bottom:10px;">每章约2500字，自动保存，可随时中断。建议每次最多10章。</div>
-        <button class="btn-secondary" onclick="generateBatch()" id="batch-btn">⚡ 开始批量生成</button>
+        <button class="btn-secondary" onclick="generateBatch()" id="batch-btn">⚡ 批量生成20章</button>
         <div id="batch-log" style="margin-top:8px;"></div>
       </div>
       ${state.forecast?renderForecast():''}
@@ -1439,12 +1439,24 @@ function toggleIntervention(){
   renderWriteTab(document.getElementById('write-tab-content'));
 }
 
+async function quickScore(text){
+  // 快速评分，只返回grade，token消耗极少
+  try{
+    const res=await callAI([{role:'user',content:`对以下番茄小说章节快速评分，只输出一个JSON：
+{"grade":"S/A/B/C","score":0-100}
+评分标准：字数达标(2500-3000)20分+爽感密度20分+排版20分+连贯性20分+结尾钩子20分
+只输出JSON。
+章节开头200字+结尾200字：${text.slice(0,200)}...${text.slice(-200)}`}],80);
+    const info=JSON.parse(res.replace(/```json|```/g,'').trim());
+    return info;
+  }catch(e){return{grade:'B',score:70};}// 评分失败默认B，不阻塞
+}
+
 async function generateBatch(){
-  const countInput=document.getElementById('batch-count');
-  const count=Math.min(20,Math.max(2,parseInt(countInput?.value)||5));
+  const count=20;// 固定20章
   const logEl=document.getElementById('batch-log');
   const btn=document.getElementById('batch-btn');
-  if(btn){btn.textContent='⏹ 中断批量生成';btn.onclick=()=>{state.batchStop=true;btn.textContent='正在中断...';btn.disabled=true;};}
+  if(btn){btn.textContent='⏹ 中断';btn.onclick=()=>{state.batchStop=true;btn.textContent='中断中...';btn.disabled=true;};}
   state.batchStop=false;
 
   function batchLog(msg,cls=''){
@@ -1453,100 +1465,334 @@ async function generateBatch(){
     logEl.scrollTop=logEl.scrollHeight;
   }
 
+  const startCh=(state.currentProject.chapters?.length||0)+1;
+  batchLog(`🚀 开始批量生成第${startCh}-${startCh+count-1}章，屏幕请保持亮着`,'warn');
   let successCount=0;
+
   for(let i=0;i<count;i++){
     if(state.batchStop){batchLog('⏹ 已中断','warn');break;}
     const p=state.currentProject;
     const chNum=(p.chapters?.length||0)+1;
-    batchLog(`📝 正在生成第 ${chNum} 章...`);
+    batchLog(`📝 第${chNum}章 生成中...`);
     try{
-      const text=await buildChapterText(p,chNum);
-      // Auto-save
+      let text=await buildChapterText(p,chNum);
+
+      // 快速评分，低于B级自动重生成一次
+      const scoreResult=await quickScore(text);
+      if(scoreResult.grade==='C'){
+        batchLog(`⚠️ 第${chNum}章评分${scoreResult.grade}(${scoreResult.score}分)，自动重生成...`,'warn');
+        text=await buildChapterText(p,chNum);
+      }
+
+      // 保存
       if(!p.history)p.history=[];
-      p.history.push({ver:p.history.length+1,time:Date.now(),chapterNum:chNum,text,desc:`第${chNum}章（批量生成）`});
-      p.chapters=[...(p.chapters||[]),{num:chNum,text,summary:text.slice(0,120),createdAt:Date.now()}];
+      p.history.push({ver:p.history.length+1,time:Date.now(),chapterNum:chNum,text,desc:`第${chNum}章（批量）`});
+      const chData={num:chNum,text,summary:text.slice(0,120),createdAt:Date.now(),score:scoreResult.score,grade:scoreResult.grade==='C'?'B':scoreResult.grade};
+      p.chapters=[...(p.chapters||[]),chData];
       saveProject(p);
-      updateStoryCard(text,chNum);
+      // 异步更新故事卡，不阻塞生成流程
+      updateStoryCard(text,chNum).catch(e=>console.log('故事卡更新失败',e));
       successCount++;
-      batchLog(`✓ 第 ${chNum} 章已保存（${Math.round(text.length)}字${text.length<2200?'⚠️偏少':''}）`,'ok');
+      const wl=text.length;
+      batchLog(`✅ 第${chNum}章完成 ${wl}字 ${chData.grade}${chData.score}分${wl<2400?'⚠️偏少':''}${wl>3100?'↑偏多':''}（${i+1}/${count}）`,'ok');
       renderWritingPage();
-      // Small delay to avoid rate limits
-      if(i<count-1&&!state.batchStop)await sleep(1200);
+      if(i<count-1&&!state.batchStop)await sleep(800);
     }catch(e){
-      batchLog(`❌ 第 ${chNum} 章生成失败: ${e.message.slice(0,60)}`,'err');
-      toast('批量生成中断: '+e.message.slice(0,60),'error');
+      batchLog(`❌ 第${chNum}章失败: ${e.message.slice(0,50)}`,'err');
+      toast('生成中断: '+e.message.slice(0,40),'error');
       break;
     }
   }
-  batchLog(`🎉 批量完成，共生成 ${successCount} 章`,'ok');
+  const endCh=(state.currentProject.chapters?.length||0);
+  batchLog(`🎉 完成！共生成${successCount}章（第${startCh}-${endCh}章）`,'ok');
   state.batchStop=false;
-  if(btn){btn.textContent='⚡ 开始批量生成';btn.onclick=()=>generateBatch();btn.disabled=false;}
+  if(btn){btn.textContent='⚡ 批量生成20章';btn.onclick=()=>generateBatch();btn.disabled=false;}
   renderWritingPage();
+}
+
+// 从大纲中提取当前章节相关片段
+function getOutlineSlice(outline,chNum,wordTier){
+  if(!outline)return'';
+  const chapters=wordTier?.chapters||400;
+  const volSize=Math.ceil(chapters/(chapters<=200?3:chapters<=400?4:chapters<=600?5:6));
+  const volNum=Math.ceil(chNum/volSize);
+  const volKeywords=[`第${volNum}卷`,`第${volNum}卷上`,`第${volNum}卷下`];
+  let best='';
+  for(const kw of volKeywords){
+    const idx=outline.indexOf(kw);
+    if(idx>=0){best=outline.slice(idx,idx+600);break;}
+  }
+  return best||outline.slice(0,400);
+}
+
+// ══ 各模型专属Prompt策略 ══
+function buildPromptByModel(providerId,coreData){
+  const {title,genre,tone,protagonist,ability,hookPoints,forbidden,
+         outlineRef,characters,recentEvents,foreshadowing,
+         lastSnap,prevSummary,prevPrevSummary,
+         intervention,openingInstr,pacingHint,chNum}=coreData;
+
+  // 所有模型共用的核心内容块
+  const coreBlock=`【书名】${title}｜【类型】${genre}｜【基调】${tone}
+【主角】${protagonist}｜【金手指】${ability}
+【核心爽点】${hookPoints}
+【禁忌内容】${forbidden}
+
+【当前卷大纲】
+${outlineRef}
+
+【故事状态】
+出场人物：${characters}
+近期事件：${recentEvents}
+未解伏笔：${foreshadowing}
+
+【上章接续】
+${lastSnap?'上章结尾场景：'+lastSnap:prevSummary?'上章摘要：'+prevSummary:'第一章，全新开始'}
+${prevPrevSummary?'前前章：'+prevPrevSummary:''}
+${intervention?'【特别指令】'+intervention:''}
+${openingInstr}
+【节奏】${pacingHint}`;
+
+  // 输出规范（所有模型通用）
+  const outputRules=`输出规范：
+第一行写"第${chNum}章 [标题]"，空行后开始正文。
+字数2500-3000字。开头直接衔接上章结尾。每600-800字一个情绪推进或爽点。
+短句为主，对话后空行，情绪爆发单句成段。结尾必须是悬念/冲突/反转钩子。
+口语化文风，禁止说教腔、AI排比腔、"却说""话说""笔者"等词。`;
+
+  switch(providerId){
+
+    case 'deepseek':
+      // DeepSeek：结构化分隔符+编号强约束，严格执行每条规则
+      return `你是专业番茄小说作者。直接输出成品正文，禁止输出思考过程或注释。
+
+━━ 设定与状态 ━━
+${coreBlock}
+
+━━ 强制输出规范（每条必须遵守）━━
+✦ 第一行：第${chNum}章 [标题名]，然后空行
+✦ 字数：2500-3000字，不足补充，超出删减
+✦ 开头：直接从上章结尾场景衔接，禁止另起炉灶
+✦ 节奏：每600-800字出现情绪推进或小爽点
+✦ 排版：短句为主，对话后空行，爆发时单句成段
+✦ 结尾：强钩子（悬念/冲突/反转），让读者迫切翻下一章
+✦ 文风：口语化，有人情味，禁止AI排比腔和说教
+✦ 禁词：却说/话说/笔者/（注）/综上所述`;
+
+    case 'kimi':
+      // Kimi：自然语言描述+长上下文优势，强调连贯性
+      return `你是一位深谙番茄小说之道的资深作者，正在创作《${title}》的第${chNum}章。
+
+请充分利用以下完整上下文，确保本章与前文无缝衔接：
+
+${coreBlock}
+
+写作要求：
+请用流畅自然的中文写出2500-3000字的章节正文。本章开头必须直接延续上章结尾的场景和氛围，不要另起话题。行文中每隔600-800字安排一个情绪高潮或爽点，结尾设置一个让读者迫不及待翻页的钩子。多用短句，对话后记得换行，重要台词单独成段。语言要生活化、有温度，避免机械的排比句式。
+
+${outputRules}`;
+
+    case 'qwen':
+      // 通义千问：角色扮演身份设定+场景代入
+      return `角色设定：你是中国顶级网络小说作者，专注番茄平台爽文创作，已有多部百万字作品。你对读者心理了如指掌，知道什么时候该出爽点、什么时候该埋钩子。
+
+现在你正在创作《${title}》第${chNum}章。
+
+${coreBlock}
+
+作为专业作者，你深知：
+- 开头必须抓住读者，直接延续上章末尾的张力
+- 每个场景都要服务于情节推进，不写废话
+- 爽点要精准，该爆发时绝不拖沓
+- 结尾钩子是留住读者的关键
+
+${outputRules}`;
+
+    case 'zhipu':
+      // 智谱GLM：否定式约束收紧创意，明确边界
+      return `你是番茄小说专业作者，现在创作《${title}》第${chNum}章。
+
+${coreBlock}
+
+【严格禁止以下行为】
+✗ 禁止脱离上章结尾场景另起炉灶
+✗ 禁止连续300字以上没有情节推进
+✗ 禁止使用"然而""于是""这时候""话说"等过渡词
+✗ 禁止写大段心理独白代替行动
+✗ 禁止结尾平淡收尾，必须有悬念钩子
+✗ 禁止超过3100字或少于2400字
+✗ 禁止整齐的三段式排比结构
+
+【必须做到】
+✓ 第一句话直接从上章结尾场景切入
+✓ 每600-800字安排一次爽点或情绪推进
+✓ 短句为主，对话后空行，爆发时单句成段
+✓ 结尾留下一个让读者忍不住翻页的钩子
+
+${outputRules}`;
+
+    case 'doubao':
+      // 豆包：活泼轻松的指令风格，适合轻松爽文
+      return `来写《${title}》第${chNum}章！
+
+你是一个超懂番茄读者口味的小说作者，写出来的东西就是爽、就是想看、就是停不下来。
+
+${coreBlock}
+
+写作要点（记住这几个就够了）：
+① 开头直接接上一章的剧情，别重新介绍背景
+② 每隔几段就要有个让读者眼睛一亮的爽点或转折
+③ 多写对话和动作，少写枯燥的心理活动
+④ 短句短句短句！一句话不超过20个字最好
+⑤ 最后一句话要让人迫不及待想看下一章
+
+${outputRules}`;
+
+    case 'wenxin':
+      // 文心一言：规范清晰的任务描述，强调内容安全
+      return `任务：创作网络小说《${title}》第${chNum}章
+
+作品信息：
+${coreBlock}
+
+创作规范：
+1. 内容必须健康积极，符合平台发布标准
+2. 开篇直接承接上章情节，保持故事连贯性
+3. 情节推进节奏明快，每600-800字设置一个情节高潮
+4. 人物对话自然生动，符合各自性格特征
+5. 章节结尾设置悬念，引导读者继续阅读
+6. 字数控制在2500-3000字之间
+7. 采用短句为主的番茄小说排版风格
+
+${outputRules}`;
+
+    case 'claude':
+      // Claude：完整背景+自然语言描述期望效果，发挥理解力
+      return `请为网络小说《${title}》创作第${chNum}章。
+
+这是一部${genre}类型的番茄爽文，基调${tone}。以下是完整的创作背景：
+
+${coreBlock}
+
+我希望这一章能做到：本章开头自然地从上一章结尾的场景过渡进来，让读者感觉故事在流畅地流动，没有割裂感。行文过程中保持番茄爽文的节奏感，大约每600-800字给读者一个情绪满足点，可以是主角的机智反应、小小的逆袭，或者推进了某个核心矛盾。语言风格要口语化、有生活气息，对话要符合人物性格，避免所有角色说话都像一个腔调。最后用一个让人忍不住往下看的钩子收尾。字数在2500-3000字之间，排版符合番茄小说风格（短句、对话空行、情绪爆发时单句成段）。
+
+${outputRules}`;
+
+    case 'openai':
+      // OpenAI GPT-4o：system/user分离风格，规则放前面内容放后面
+      return `SYSTEM: You are a professional Chinese web novel author specializing in "番茄小说" (Tomato Novel) style fiction. Your writing is fast-paced, emotionally engaging, and always leaves readers wanting more.
+
+RULES (strictly follow all):
+- Output ONLY the chapter content, no meta-commentary
+- Chapter title format: 第${chNum}章 [title], then blank line, then content
+- Word count: 2500-3000 Chinese characters
+- Opening: directly continue from previous chapter's ending scene
+- Pacing: emotional peak or plot advancement every 600-800 characters  
+- Format: short sentences (10-20 chars), blank line after dialogue, single-sentence paragraphs for emotional climax
+- Ending: strong hook (suspense/conflict/twist)
+- Style: natural spoken Chinese, no AI-style parallel structures or lecturing tone
+
+CONTENT:
+${coreBlock}
+
+${outputRules}`;
+
+    case 'gemini':
+      // Gemini：多模态思维方式，场景化描述+世界观构建
+      return `你正在为一部中国番茄风格网络小说创作章节内容。
+
+作品世界观与当前状态：
+${coreBlock}
+
+创作方向：
+想象你是这个世界的观察者，用电影镜头感来描述这一章的场景。开篇从上一章结尾的具体场景切入，带领读者进入画面。随着情节推进，在关键时刻给予读者情绪满足——可以是一次漂亮的反击，一个出人意料的转折，或者一段让人动容的对话。章节结尾要像电影预告片一样，留下一个让人期待下一集的悬念。
+
+技术要求：
+字数2500-3000字，短句为主，番茄排版风格，结尾强钩子。
+
+${outputRules}`;
+
+    case 'groq':
+      // Groq/Llama：简洁直接，减少复杂嵌套，英文关键词提示
+      return `Write chapter ${chNum} of Chinese web novel "《${title}》" in 番茄小说 style.
+
+Key info:
+${coreBlock}
+
+Critical requirements:
+- Start DIRECTLY from where last chapter ended (no recap)
+- 2500-3000 Chinese characters
+- Add excitement/爽点 every 600-800 characters  
+- Short sentences, dialogue followed by blank lines
+- End with strong cliffhanger/hook
+- Natural spoken Chinese, no stiff AI writing patterns
+- Chapter title: 第${chNum}章 [标题]
+
+${outputRules}`;
+
+    default:
+      // 自定义API：通用强约束版本
+      return `你是专业番茄小说作者，正在创作《${title}》第${chNum}章。直接输出正文，禁止输出分析或注释。
+
+${coreBlock}
+
+${outputRules}`;
+  }
 }
 
 async function buildChapterText(p,chNum){
   const isOpening=chNum<=3;
-  const prevChaps=p.chapters?.slice(-3)||[];
   const card=p.storyCard||{};
+  const prevChap=p.chapters?.slice(-1)[0]||null;
+  const prevPrevChap=p.chapters?.slice(-2,-1)[0]||null;
+  const lastSnap=prevChap?.endingSnapshot||'';
+  const outlineRef=getOutlineSlice(p.outline,chNum,p.wordTier);
 
-  // Determine pacing hint based on chapter number
-  const outlineRef=p.outline?(p.outline.slice(0,600)):'';
-  const isBigSlapChapter=(chNum%10===0);
-  const isMediumSlapChapter=(chNum%5===0&&chNum%10!==0);
-  const pacingHint=isBigSlapChapter?'【⚡本章是大爽点章节！必须有重量级打脸/突破/震惊全场的高潮场面，读者等了10章了，要让他们爽翻】':
-    isMediumSlapChapter?'【本章是中型爽点章节，需要有一个明显的情绪高潮和爽感积累】':
-    '【本章稳步推进，设置悬念，为下一个爽点蓄力】';
+  const isBigSlap=(chNum%10===0);
+  const isMidSlap=(chNum%5===0&&chNum%10!==0);
+  const pacingHint=isBigSlap
+    ?`第${chNum}章大爽点节点：必须有震撼全场的高潮，读者等了10章，这章要让他们大呼过瘾`
+    :isMidSlap
+    ?'中型爽点节点：需要一个清晰的情绪高潮，让读者感到满足并期待后续'
+    :'稳步推进：埋设悬念，铺垫下一个爽点，结尾钩子要足够强';
 
-  const openingInstr=isOpening?`
-【开局特别要求 - 第${chNum}章】
-${p.openingStyle==='slap'?'开局打脸风格：直接展现主角被羞辱或低估，然后立即有反击或金手指觉醒，第一章要让读者立刻爽到':
-  p.openingStyle==='mystery'?'悬念钩子风格：埋下重大谜题，第一章结尾要有强烈悬念，让读者必须看下一章':
-  'AI智能开局：基于故事设定，选择最能抓住读者的开局方式，前三章是黄金留读时间'}
-第一章结尾必须有强烈悬念，第二章必须出现第一个明显爽点，第三章要让读者看到主角的潜力上限。`:'';
+  const openingStyleMap={
+    slap:'打脸流：第一幕展现被羞辱场景，立刻给出反击或觉醒，第一章让读者就爽',
+    mystery:'悬念流：第一幕埋大谜题，结尾留强悬念，让读者必须翻下一章',
+    system:'系统流：开局展示系统觉醒，第一章让读者看到系统的强大',
+    reborn:'重生流：第一幕交代重生时刻，立刻展开复仇布局',
+    peak:'巅峰流：先展示极致高光，然后急转直下，激发读者陪主角崛起的欲望',
+    ai:'AI智能开局：根据设定选择最抓人的开场方式',
+  };
+  const openingInstr=isOpening
+    ?`开局风格（${openingStyleMap[p.openingStyle]||openingStyleMap.ai}）
+前三章铁律：第1章结尾强悬念，第2章出现第一个爽点，第3章展现主角潜力上限。`
+    :'';
 
-  return await callAI([{role:'user',content:`你是资深番茄小说作者。在输出正文之前，你需要在脑海中完成以下全部思考工作，但【绝对不允许】把思考过程输出出来，只输出最终成品正文。
+  const coreData={
+    title:p.settings.title||'未命名',
+    genre:p.settings.genre||'',
+    tone:p.settings.emotional_tone||'热血爽文',
+    protagonist:p.settings.protagonist_name||'主角',
+    ability:(p.settings.protagonist_ability||'').slice(0,80),
+    hookPoints:(p.settings.hook_points||'').slice(0,80),
+    forbidden:p.settings.forbidden_content||'无',
+    outlineRef,
+    characters:(card.characters||[]).slice(0,15).join('、')||'无',
+    recentEvents:(card.events||[]).slice(-5).join('；')||'无',
+    foreshadowing:(card.foreshadowing||[]).slice(0,5).join('；')||'无',
+    lastSnap,
+    prevSummary:prevChap?.summary||prevChap?.text?.slice(0,120)||'',
+    prevPrevSummary:prevPrevChap?.summary||prevPrevChap?.text?.slice(0,80)||'',
+    intervention:state.intervention||'',
+    openingInstr,
+    pacingHint,
+    chNum,
+  };
 
-脑海中需要完成的工作（不输出）：
-① 剧情规划：基于大纲和前文，规划本章起承转合，确认爽点位置，设计结尾钩子
-② 连贯性检查：检查人物名字/设定是否与前文一致，情节是否有矛盾，伏笔是否有呼应
-③ 润色处理：去除AI腔，打破整齐排比，加入口语化表达，增强人情味和代入感
-④ 排版处理：短句化，对话空行，金句独立成段，情绪高潮处单句成段
-⑤ 字数检查：确认正文在2500-3000字之间，不足则补充细节和过渡，超出则精简
-
-【小说核心设定】
-书名：${p.settings.title} | 类型：${p.settings.genre}
-主角：${p.settings.protagonist_name}
-背景：${(p.settings.protagonist_bg||'').slice(0,80)}
-金手指：${(p.settings.protagonist_ability||'').slice(0,100)}
-核心爽点：${(p.settings.hook_points||'').slice(0,100)}
-情感基调：${p.settings.emotional_tone}
-写作风格：${p.settings.writing_style||''}
-禁忌内容：${p.settings.forbidden_content||'无'}
-
-【大纲参考（必须遵照）】
-${outlineRef}
-
-【故事状态卡（严格遵守，不能有矛盾）】
-已出场人物：${(card.characters||[]).join('、')||'无'}
-最近事件：${(card.events||[]).slice(-4).join('；')||'无'}
-当前伏笔：${(card.foreshadowing||[]).join('；')||'无'}
-情绪节点：${(card.emotionNodes||[]).slice(-2).join('；')||'无'}
-
-【前章摘要（保证剧情连贯）】
-${prevChaps.map((c,i)=>`第${chNum-prevChaps.length+i}章：${c.summary||c.text?.slice(0,100)}`).join('\n')||'（第一章，全新开始）'}
-
-${state.intervention?`【读者干预指令 - 必须执行】\n${state.intervention}`:''}
-${openingInstr}
-${pacingHint}
-
-【输出规则 - 严格遵守】
-1. 直接输出章节标题和正文，不输出任何分析、注释、说明
-2. 第一行格式：第${chNum}章 [标题名]
-3. 正文字数：2500-3000字（硬性要求，不足必须补充）
-4. 排版：短句为主，情绪高潮处单句成段，对话后空行，金句独立成段
-5. 结尾必须有强钩子
-6. 不得出现"笔者""作者""（注）"等元叙述内容
-7. 文字自然口语化，有人情味，不说教`}],4500);
+  const providerId=state.selectedProvider||'deepseek';
+  const prompt=buildPromptByModel(providerId,coreData);
+  return await callAI([{role:'user',content:prompt}],4000);
 }
 
 async function generateChapter(){
@@ -1574,18 +1820,32 @@ async function generateChapter(){
 
 async function updateStoryCard(text,chNum){
   try{
-    const res=await callAI([{role:'user',content:`提取这段小说章节的关键信息，只输出JSON：
-{"newChars":["新出场人物"],"keyEvent":"本章核心事件一句话","newFore":["新伏笔"],"resolveFore":["解决的伏笔"],"emotionNode":"情绪节点"}
+    // 单次请求同时提取故事卡信息和收尾快照，节省token
+    const res=await callAI([{role:'user',content:`提取以下小说章节的关键信息，只输出JSON，不要其他内容：
+{
+  "newChars":["新出场人物名字"],
+  "keyEvent":"本章核心事件（一句话，20字以内）",
+  "newFore":["新埋下的伏笔（每条10字以内）"],
+  "resolveFore":["本章解决的伏笔"],
+  "emotionNode":"本章情绪节点（10字以内）",
+  "endingSnapshot":"本章最后一幕的场景描述（50字以内，下一章必须从这里接续）"
+}
 
-章节：${text.slice(0,1200)}`}],300);
+章节末尾500字：${text.slice(-500)}`}],400);
     const clean=res.replace(/```json|```/g,'').trim();
     const info=JSON.parse(clean);
     const card=state.currentProject.storyCard||{characters:[],events:[],foreshadowing:[],emotionNodes:[]};
     card.characters=[...new Set([...card.characters,...(info.newChars||[])])];
-    card.events=[...card.events,info.keyEvent].filter(Boolean);
-    card.foreshadowing=[...card.foreshadowing.filter(f=>!(info.resolveFore||[]).includes(f)),...(info.newFore||[])];
-    card.emotionNodes=[...card.emotionNodes,info.emotionNode].filter(Boolean);
+    card.events=[...card.events,info.keyEvent].filter(Boolean).slice(-20);// 只保留最近20条
+    card.foreshadowing=[...card.foreshadowing.filter(f=>!(info.resolveFore||[]).includes(f)),...(info.newFore||[])].slice(0,10);
+    card.emotionNodes=[...card.emotionNodes,info.emotionNode].filter(Boolean).slice(-10);
     state.currentProject.storyCard=card;
+    // 把收尾快照存到最后一章
+    const chapters=state.currentProject.chapters||[];
+    const lastCh=chapters[chapters.length-1];
+    if(lastCh&&info.endingSnapshot){
+      lastCh.endingSnapshot=info.endingSnapshot;
+    }
   }catch(e){console.log('故事卡更新失败',e);}
 }
 
