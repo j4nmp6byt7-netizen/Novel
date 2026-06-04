@@ -1532,16 +1532,21 @@ function toggleIntervention(){
 }
 
 async function quickScore(text){
-  // 快速评分，只返回grade，token消耗极少
+  // 字数预检：直接判断，不消耗token
+  const wl=text.length;
+  if(wl<1700)return{grade:'C',score:40,reason:'字数严重不足'};
+  if(wl>2700)return{grade:'B',score:72,reason:'字数偏多'};
+  // 正常范围才走AI评分
   try{
-    const res=await callAI([{role:'user',content:`对以下番茄小说章节快速评分，只输出一个JSON：
+    const res=await callAI([{role:'user',content:`对以下番茄小说章节快速评分，只输出JSON：
 {"grade":"S/A/B/C","score":0-100}
-评分标准：字数达标(2500-3000)20分+爽感密度20分+排版20分+连贯性20分+结尾钩子20分
-只输出JSON。
-章节开头200字+结尾200字：${text.slice(0,200)}...${text.slice(-200)}`}],80);
+评分标准：字数达标(1800-2500字)25分+爽感密度25分+连贯性25分+结尾钩子25分
+只输出JSON，不要其他任何内容。
+章节开头150字：${text.slice(0,150)}
+章节结尾150字：${text.slice(-150)}`}],60);
     const info=JSON.parse(res.replace(/```json|```/g,'').trim());
     return info;
-  }catch(e){return{grade:'B',score:70};}// 评分失败默认B，不阻塞
+  }catch(e){return{grade:'B',score:75};}
 }
 
 async function generateBatch(){
@@ -1667,7 +1672,7 @@ function getOutlineSlice(outline,chNum,wordTier){
 function buildPromptByModel(providerId,coreData){
   const {title,genre,tone,protagonist,ability,hookPoints,forbidden,
          outlineRef,characters,recentEvents,foreshadowing,
-         lastSnap,prevSummary,prevPrevSummary,
+         lastSnap,prevRawEnding,prevSummary,prevPrevSummary,
          intervention,openingInstr,pacingHint,chNum}=coreData;
 
   // 所有模型共用的核心内容块
@@ -1676,27 +1681,41 @@ function buildPromptByModel(providerId,coreData){
 【核心爽点】${hookPoints}
 【禁忌内容】${forbidden}
 
-【当前卷大纲】
+【当前卷大纲（本章依据）】
 ${outlineRef}
 
-【故事状态】
+【故事状态（严格遵守）】
 出场人物：${characters}
 近期事件：${recentEvents}
 未解伏笔：${foreshadowing}
 
-【上章接续】
-${lastSnap?'上章结尾场景：'+lastSnap:prevSummary?'上章摘要：'+prevSummary:'第一章，全新开始'}
-${prevPrevSummary?'前前章：'+prevPrevSummary:''}
-${intervention?'【特别指令】'+intervention:''}
+【上章接续——必须从此处自然衔接，第一句话不得跳场景】
+${lastSnap?'上章结尾场景快照：'+lastSnap:''}
+${prevRawEnding?'上章末尾原文（直接接续此处）：\n'+prevRawEnding:''}
+${!lastSnap&&!prevRawEnding?(prevSummary?'上章摘要：'+prevSummary:'第一章，全新开始'):''}
+${prevPrevSummary?'前前章摘要：'+prevPrevSummary:''}
+${intervention?'\n【特别指令——必须执行】'+intervention:''}
 ${openingInstr}
-【节奏】${pacingHint}`;
+【本章节奏】${pacingHint}`;
+
+  // 番茄爆款公式（所有模型通用）
+  const tomatoFormula=`番茄爆款公式：
+· 对话占比35-45%，动作描写30%，心理描写不超过15%，环境描写不超过10%
+· 每章必须有至少一个"小高潮"（打脸/突破/揭秘/反转/爽点之一）
+· 禁止大段风景描写和背景交代，场景必须推动情节
+· 主角形象：处变不惊，说话简短有力，行动优先于思考
+· 爽点前必须有铺垫（委屈/压迫/怀疑），爽点后必须有余波（震惊/佩服/恐惧）`;
 
   // 输出规范（所有模型通用）
   const outputRules=`输出规范：
 第一行写"第${chNum}章 [标题]"，空行后开始正文。
-字数2500-3000字。开头直接衔接上章结尾。每600-800字一个情绪推进或爽点。
-短句为主，对话后空行，情绪爆发单句成段。结尾必须是悬念/冲突/反转钩子。
-口语化文风，禁止说教腔、AI排比腔、"却说""话说""笔者"等词。`;
+字数1800-2500字（硬性要求，不足1800必须补充，超过2500必须删减）。
+开头第一句必须直接延续上章结尾场景，不得另起炉灶，不得时间跳跃。
+每500-700字安排一个情绪推进或小爽点。
+短句为主（单句不超过25字），对话后空行，情绪爆发时单句成段。
+结尾必须是强钩子（悬念/冲突/反转），让读者迫不及待翻下一章。
+口语化文风，有温度有人情味，禁止说教腔、AI排比腔。
+禁词：却说/话说/笔者/（注）/综上所述/不得不说/值得一提。`;
 
   switch(providerId){
 
@@ -1709,7 +1728,7 @@ ${coreBlock}
 
 ━━ 强制输出规范（每条必须遵守）━━
 ✦ 第一行：第${chNum}章 [标题名]，然后空行
-✦ 字数：2500-3000字，不足补充，超出删减
+✦ 字数1800-2500字，不足补充，超出删减
 ✦ 开头：直接从上章结尾场景衔接，禁止另起炉灶
 ✦ 节奏：每600-800字出现情绪推进或小爽点
 ✦ 排版：短句为主，对话后空行，爆发时单句成段
@@ -1726,7 +1745,7 @@ ${coreBlock}
 ${coreBlock}
 
 写作要求：
-请用流畅自然的中文写出2500-3000字的章节正文。本章开头必须直接延续上章结尾的场景和氛围，不要另起话题。行文中每隔600-800字安排一个情绪高潮或爽点，结尾设置一个让读者迫不及待翻页的钩子。多用短句，对话后记得换行，重要台词单独成段。语言要生活化、有温度，避免机械的排比句式。
+请用流畅自然的中文写出1800-2500字的章节正文。本章开头必须直接延续上章结尾的场景和氛围，不要另起话题。行文中每隔600-800字安排一个情绪高潮或爽点，结尾设置一个让读者迫不及待翻页的钩子。多用短句，对话后记得换行，重要台词单独成段。语言要生活化、有温度，避免机械的排比句式。
 
 ${outputRules}`;
 
@@ -1799,7 +1818,7 @@ ${coreBlock}
 3. 情节推进节奏明快，每600-800字设置一个情节高潮
 4. 人物对话自然生动，符合各自性格特征
 5. 章节结尾设置悬念，引导读者继续阅读
-6. 字数控制在2500-3000字之间
+6. 字数控制在1800-2500字之间
 7. 采用短句为主的番茄小说排版风格
 
 ${outputRules}`;
@@ -1812,7 +1831,7 @@ ${outputRules}`;
 
 ${coreBlock}
 
-我希望这一章能做到：本章开头自然地从上一章结尾的场景过渡进来，让读者感觉故事在流畅地流动，没有割裂感。行文过程中保持番茄爽文的节奏感，大约每600-800字给读者一个情绪满足点，可以是主角的机智反应、小小的逆袭，或者推进了某个核心矛盾。语言风格要口语化、有生活气息，对话要符合人物性格，避免所有角色说话都像一个腔调。最后用一个让人忍不住往下看的钩子收尾。字数在2500-3000字之间，排版符合番茄小说风格（短句、对话空行、情绪爆发时单句成段）。
+我希望这一章能做到：本章开头自然地从上一章结尾的场景过渡进来，让读者感觉故事在流畅地流动，没有割裂感。行文过程中保持番茄爽文的节奏感，大约每600-800字给读者一个情绪满足点，可以是主角的机智反应、小小的逆袭，或者推进了某个核心矛盾。语言风格要口语化、有生活气息，对话要符合人物性格，避免所有角色说话都像一个腔调。最后用一个让人忍不住往下看的钩子收尾。字数在1800-2500字之间，排版符合番茄小说风格（短句、对话空行、情绪爆发时单句成段）。
 
 ${outputRules}`;
 
@@ -1846,7 +1865,7 @@ ${coreBlock}
 想象你是这个世界的观察者，用电影镜头感来描述这一章的场景。开篇从上一章结尾的具体场景切入，带领读者进入画面。随着情节推进，在关键时刻给予读者情绪满足——可以是一次漂亮的反击，一个出人意料的转折，或者一段让人动容的对话。章节结尾要像电影预告片一样，留下一个让人期待下一集的悬念。
 
 技术要求：
-字数2500-3000字，短句为主，番茄排版风格，结尾强钩子。
+字数1800-2500字，短句为主，番茄排版风格，结尾强钩子。
 
 ${outputRules}`;
 
@@ -1907,6 +1926,9 @@ async function buildChapterText(p,chNum){
 前三章铁律：第1章结尾强悬念，第2章出现第一个爽点，第3章展现主角潜力上限。`
     :'';
 
+  // 上章末尾300字原文，确保接续连贯
+  const prevRawEnding=prevChap?.text?.slice(-300)||'';
+
   const coreData={
     title:p.settings.title||'未命名',
     genre:p.settings.genre||'',
@@ -1920,6 +1942,7 @@ async function buildChapterText(p,chNum){
     recentEvents:(card.events||[]).slice(-5).join('；')||'无',
     foreshadowing:(card.foreshadowing||[]).slice(0,5).join('；')||'无',
     lastSnap,
+    prevRawEnding,
     prevSummary:prevChap?.summary||prevChap?.text?.slice(0,120)||'',
     prevPrevSummary:prevPrevChap?.summary||prevPrevChap?.text?.slice(0,80)||'',
     intervention:state.intervention||'',
@@ -2107,6 +2130,7 @@ function saveChapter(){
   if(!draft){toast('没有内容可保存','error');return;}
   const p=state.currentProject;
   const chNum=(p.chapters?.length||0)+1;
+  const totalCh=p.wordTier?.chapters||400;
   if(!p.history)p.history=[];
   p.history.push({ver:p.history.length+1,time:Date.now(),chapterNum:chNum,text:draft,desc:`第${chNum}章初稿`});
   p.chapters=[...(p.chapters||[]),{num:chNum,text:draft,summary:draft.slice(0,120),createdAt:Date.now(),score:null}];
@@ -2115,20 +2139,90 @@ function saveChapter(){
   state.intervention='';
   state.showIntervention=false;
   saveProject(p);
+  // 完结检测
+  const isFinished=(chNum>=totalCh);
   renderWritingPage();
   toast(`第${chNum}章已保存 ✓`,'success');
-  // 后台自动评分（不阻塞UI）
   autoScoreChapter(p,chNum,draft);
-  if(chNum%10===0)setTimeout(()=>toast(`已完成${chNum}章，可在章节工具中进行全局检测`,'info'),600);
+  if(isFinished){
+    setTimeout(()=>showFinishedAnalysis(p),1500);
+  } else if(chNum%10===0){
+    setTimeout(()=>toast(`已完成${chNum}章，可在章节工具中进行全局检测`,'info'),600);
+  }
+}
+
+async function showFinishedAnalysis(p){
+  toast('🎉 全书完结！正在生成发布建议...','success');
+  const chapters=p.chapters||[];
+  const totalWords=chapters.reduce((s,c)=>s+(c.text?.length||0),0);
+  const scores=chapters.filter(c=>c.score!=null).map(c=>c.score);
+  const avgScore=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1):0;
+  const sCount=chapters.filter(c=>c.grade==='S').length;
+  const aCount=chapters.filter(c=>c.grade==='A').length;
+  const bCount=chapters.filter(c=>c.grade==='B').length;
+  const cCount=chapters.filter(c=>c.grade==='C').length;
+
+  try{
+    const analysis=await callAI([{role:'user',content:`你是番茄小说运营专家。根据以下小说数据，给出专业的发布策略建议：
+
+【作品信息】
+书名：${p.settings?.title}
+类型：${p.settings?.genre}
+总章数：${chapters.length}章
+总字数：约${Math.round(totalWords/10000*10)/10}万字
+平均评分：${avgScore}分（S:${sCount}章 A:${aCount}章 B:${bCount}章 C:${cCount}章）
+
+【番茄平台数据背景】
+- 番茄小说用户高峰：早7-9点、午12-14点、晚20-23点
+- 男频爽文最佳更新频率：每日2-4章
+- 新书期（前30章）：高频更新留住读者
+- 稳定期：规律更新建立信任感
+
+请输出：
+1. 📊 作品质量总结（基于评分数据，客观评价）
+2. ⏰ 最佳每日发布时间（给出具体时间段和原因）
+3. 📅 建议日更章节数（新书期/稳定期分别建议，给出原因）
+4. 🚀 冲榜策略（如何在番茄平台获得更多推荐）
+5. ⚠️ 需要注意的问题（基于C级章节分布给出建议）
+
+输出专业简洁，约300字。`}],800);
+
+    // 在写作页显示完结分析弹窗
+    const overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9998;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px 0;';
+    overlay.innerHTML=`
+      <div style="background:var(--bg2);border:1px solid var(--gold);border-radius:16px;padding:20px;max-width:480px;width:90%;margin:auto;">
+        <div style="text-align:center;margin-bottom:16px;">
+          <div style="font-size:48px;">🎊</div>
+          <div style="color:var(--gold);font-size:20px;font-weight:900;margin-top:8px;">全书完结！</div>
+          <div style="color:var(--muted2);font-size:13px;margin-top:4px;">《${p.settings?.title}》共${chapters.length}章，约${Math.round(totalWords/10000*10)/10}万字</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:16px;">
+          <div style="background:rgba(255,215,0,.1);border-radius:8px;padding:8px;text-align:center;"><div style="color:#ffd700;font-size:18px;font-weight:700;">${sCount}</div><div style="color:var(--muted);font-size:10px;">S级</div></div>
+          <div style="background:rgba(34,197,94,.1);border-radius:8px;padding:8px;text-align:center;"><div style="color:#22c55e;font-size:18px;font-weight:700;">${aCount}</div><div style="color:var(--muted);font-size:10px;">A级</div></div>
+          <div style="background:rgba(240,165,0,.1);border-radius:8px;padding:8px;text-align:center;"><div style="color:var(--gold);font-size:18px;font-weight:700;">${bCount}</div><div style="color:var(--muted);font-size:10px;">B级</div></div>
+          <div style="background:rgba(232,64,64,.1);border-radius:8px;padding:8px;text-align:center;"><div style="color:var(--red);font-size:18px;font-weight:700;">${cCount}</div><div style="color:var(--muted);font-size:10px;">C级</div></div>
+        </div>
+        <div style="background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:16px;">
+          <div style="color:var(--gold);font-size:13px;font-weight:700;margin-bottom:8px;">📋 发布运营建议</div>
+          <div style="color:#d1d1d8;font-size:13px;line-height:1.8;white-space:pre-wrap;">${analysis}</div>
+        </div>
+        <button onclick="this.closest('div[style*=fixed]').remove()" style="display:block;width:100%;padding:12px;background:linear-gradient(135deg,var(--gold),#c07800);color:#000;border:none;border-radius:10px;font-size:15px;font-weight:900;cursor:pointer;">知道了，开始发布 🚀</button>
+      </div>`;
+    document.body.appendChild(overlay);
+  }catch(e){
+    toast('完结！发布建议生成失败，可稍后重试','info');
+  }
 }
 
 async function autoScoreChapter(p,chNum,text){
   try{
-    const res=await callAI([{role:'user',content:`对以下番茄小说章节进行快速评分，只输出JSON：
+    const res=await callAI([{role:'user',content:`对以下番茄小说章节评分，只输出JSON：
 {"score":0-100,"grade":"S/A/B/C"}
-评分标准：字数达标(2500-3000)20分，爽感密度20分，排版规范20分，剧情连贯20分，结尾钩子20分。
-只输出JSON，不要任何其他内容。
-章节前500字：${text.slice(0,500)}`}],100);
+评分标准：字数达标(1800-2500字)25分，爽感密度25分，剧情连贯25分，结尾钩子25分。
+S级90+，A级75-89，B级60-74，C级60以下。
+只输出JSON。
+章节开头200字+结尾200字：${text.slice(0,200)}...${text.slice(-200)}`}],80);
     const info=JSON.parse(res.replace(/```json|```/g,'').trim());
     const ch=p.chapters.find(x=>x.num===chNum);
     if(ch){
