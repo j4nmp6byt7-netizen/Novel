@@ -457,8 +457,8 @@ const DEFAULT_FIELDS = [
   {k:'special_notes',l:'其他特殊设定',t:'textarea',p:'任何其他重要设定，越详细越好'},
 ];
 
-const STEPS = ['idea','analysis','settings','outline','wordcount','ready'];
-const STEP_LABELS = ['💡创意','📚拆书','⚙️设定','📋大纲','📊字数','🚀出发'];
+const STEPS = ['idea','analysis','settings','wordcount','outline','ready'];
+const STEP_LABELS = ['💡创意','📚拆书','⚙️设定','📊字数','📋大纲','🚀出发'];
 
 let state = {
   apiConfig: JSON.parse(localStorage.getItem('apiConfig')||'{}'),
@@ -793,8 +793,8 @@ function renderCreatePage(){
   if(p.step==='idea')renderIdeaStep(el);
   else if(p.step==='analysis')renderAnalysisStep(el);
   else if(p.step==='settings')renderSettingsStep(el);
-  else if(p.step==='outline')renderOutlineStep(el);
   else if(p.step==='wordcount')renderWordcountStep(el);
+  else if(p.step==='outline')renderOutlineStep(el);
   else if(p.step==='ready')renderReadyStep(el);
 }
 
@@ -1206,7 +1206,7 @@ function renderOutlineStep(el){
   const p=state.currentProject;
   el.innerHTML=`
     <div class="step-title">📋 大纲生成</div>
-    <div class="step-desc">AI根据设定和字数规划，生成最适合的章节架构</div>
+    <div class="step-desc">先确定目标字数，AI将根据字数精准规划大纲节奏</div>
     <button class="btn-primary" onclick="generateOutline()">🗂️ 生成大纲</button>
     <div id="outline-area" style="margin-top:12px;">
       ${p.outline?`
@@ -1222,7 +1222,7 @@ function renderOutlineStep(el){
       </div>
       <textarea id="outline-text" style="display:none;">${htmlEsc(p.outline)}</textarea>
       <div style="height:100px;"></div>
-      <button class="btn-primary" onclick="confirmOutline()" style="position:sticky;bottom:16px;box-shadow:0 -8px 24px rgba(0,0,0,0.8);">确认大纲，规划字数 →</button>`:''}
+      <button class="btn-primary" onclick="confirmOutline()" style="position:sticky;bottom:16px;box-shadow:0 -8px 24px rgba(0,0,0,0.8);">确认大纲，准备出发 →</button>`:''}
     </div>`;
 }
 
@@ -1264,23 +1264,34 @@ async function generateOutline(){
 【创作设定】
 ${baseInfo}
 
+【字数节奏规划】
+总字数：${tier.words}，共${totalCh}章，分${volCount}卷，每卷约${chPerVol}章
+每章约2000字，每卷约${Math.round(chPerVol*2000/10000)}万字
+节奏要求：每5章一个小爽点，每10章一个中爽点，每${chPerVol}章（一卷结尾）一个大爽点
+
 【输出内容】
-一、总体架构概览（5-6句话，说明整体走向、主要冲突、结局方向）
+一、总体架构概览（基于${totalCh}章的体量，说明整体走向、各卷主题、主要冲突弧线、结局方向）
 
-二、前五章详细剧情（最关键，必须非常具体）
-第1章：具体场景+开局事件+悬念设置+结尾钩子
-第2章：第一个爽点设置+读者期待引导
-第3章：展现主角潜力上限+强化粘性
-第4章：矛盾激化+关系推进
-第5章：第一个中型爽点+故事走向确立
+二、前五章详细剧情（最关键，必须非常具体，这是留住读者的黄金窗口）
+第1章：具体开场场景+核心冲突引入+结尾强悬念（让读者必须看第2章）
+第2章：第一个爽点（委屈→反击），读者开始相信主角
+第3章：展现主角金手指/能力上限，让读者看到天花板
+第4章：矛盾升级+第一个人物关系节点
+第5章：第一个中型爽点+确立故事主线走向
 
-三、关键转折点清单（按章节顺序，标明约第几章）
-第一个重大打脸 / 第一次大幅实力提升 / 感情线升温 / 反派首次正面交锋 / 中期高潮大战 / 重大反转 / 最终决战
+三、关键转折点清单（必须标明具体章节区间）
+第一个重大打脸：约第X章 / 第一次实力大幅提升：约第X章
+感情线第一次升温：约第X章 / 反派首次正面交锋：约第X章
+中期高潮大战：约第X章（全书中间位置）/ 重大反转：约第X章
+最终决战：约第${Math.round(totalCh*0.9)}章 / 大结局：第${totalCh}章
 
-四、节奏控制规则（本书专属）
-小爽点频率 / 中爽点频率 / 大爽点频率 / 结尾钩子规律
+四、节奏控制规则（严格按字数规划）
+小爽点：每5章一次（共约${Math.round(totalCh/5)}次）
+中爽点：每10章一次（共约${Math.round(totalCh/10)}次）
+大爽点：每${chPerVol}章一次（共${volCount}次，每卷一个）
+结尾钩子轮换：悬念→冲突→反转→预告，循环使用
 
-禁止写"后期更精彩"等空话，所有内容必须基于设定。`}],3000);
+禁止写"后期更精彩"等空话，所有内容必须基于设定和字数规划，具体到章节数字。`}],3000);
     outLog('✓ 第一部分完成','ok');
 
     // 每卷单独一次请求，API直接完整输出，不做任何干预
@@ -1295,36 +1306,50 @@ ${baseInfo}
 
       // 上半卷
       outLog(`📖 生成第${v}卷上（第${chStart}-${halfMid}章）...`);
+      const volChCount=halfMid-chStart+1;
       const text1=await callAI([{role:'user',content:`你是资深番茄小说作者，生成第${v}卷上半（第${chStart}-${halfMid}章）的详细大纲。
 
 【设定】${baseInfo}
 【前文参考】${prevVolSummary}
+【本段节奏要求】共${volChCount}章，小爽点每5章1次（约${Math.round(volChCount/5)}次），中爽点每10章1次（约${Math.round(volChCount/10)}次）
 
 第${v}卷上（第${chStart}-${halfMid}章）
-■ 本段核心任务：
-■ 能力成长（标明章节）：
-■ 大爽点（至少3个，标明章节，描述场景）：
+■ 本段核心任务：（主角这段要完成什么，推进到什么程度）
+■ 能力成长（标明具体章节）：
+■ 爽点节点（每个标明章节和具体场景，至少3个）：
+  - 约第X章（小爽点）：
+  - 约第X章（中爽点）：
+  - 约第X章（大爽点）：
 ■ 感情线推进：
-■ 章节详情（每10章一节点）：
-■ 段落结尾悬念：`}],4000);
+■ 章节详情（每5章一个节点，标明章节区间和核心事件）：
+■ 段落结尾悬念：（如何引出下半卷）`}],4000);
       volParts.push({title:`📖 第${v}卷上（第${chStart}-${halfMid}章）`,content:text1});
       outLog(`✓ 第${v}卷上完成`,'ok');
       await sleep(300);
 
       // 下半卷
       outLog(`📖 生成第${v}卷下（第${halfMid+1}-${chEnd}章）...`);
+      const volChCount2=chEnd-halfMid;
       const text2=await callAI([{role:'user',content:`你是资深番茄小说作者，生成第${v}卷下半（第${halfMid+1}-${chEnd}章）的详细大纲。
 
 【设定】${baseInfo}
-【上半参考】${text1.slice(-200)}
+【上半参考】${text1.slice(-300)}
+【本段节奏要求】共${volChCount2}章，本卷大爽点必须在这一段出现，是读者最期待的高潮
 
 第${v}卷下（第${halfMid+1}-${chEnd}章）
-■ 本段核心任务：
-■ 能力成长（标明章节）：
-■ 大爽点（至少3个，标明章节，描述场景）：
+■ 本段核心任务：（本卷的核心矛盾如何在这段爆发和解决）
+■ 能力成长（标明具体章节）：
+■ 爽点节点（每个标明章节和具体场景，至少3个，本卷大爽点必须在此出现）：
+  - 约第X章（小爽点）：
+  - 约第X章（中爽点）：
+  - 约第X章（本卷大爽点·必须震撼）：
 ■ 感情线推进：
-■ 章节详情（每10章一节点）：
-${isLast?'■ 结局设计（主角/反派/感情线）：':'■ 段落结尾悬念（引出下卷）：'}`}],4000);
+■ 章节详情（每5章一个节点，标明章节区间和核心事件）：
+${isLast?`■ 结局设计（必须完整）：
+  主角最终状态和成就：
+  反派最终结局：
+  感情线收尾：
+  尾声设计（给读者的最后惊喜）：`:'■ 卷尾钩子（如何让读者迫不及待看下一卷）：'}`}],4000);
       volParts.push({title:`📖 第${v}卷下（第${halfMid+1}-${chEnd}章）`,content:text2});
       prevVolSummary=text2.slice(-200);
       outLog(`✓ 第${v}卷下完成`,'ok');
@@ -1352,7 +1377,7 @@ ${isLast?'■ 结局设计（主角/反派/感情线）：':'■ 段落结尾悬
       ${sectionHtml}
       <textarea id="outline-text" style="display:none;">${htmlEsc(fullOutline)}</textarea>
       <div style="height:100px;"></div>
-      <button class="btn-primary" onclick="confirmOutline()" style="position:sticky;bottom:16px;margin-top:4px;box-shadow:0 -8px 24px rgba(0,0,0,0.8);">确认大纲，规划字数 →</button>`;
+      <button class="btn-primary" onclick="confirmOutline()" style="position:sticky;bottom:16px;margin-top:4px;box-shadow:0 -8px 24px rgba(0,0,0,0.8);">确认大纲，准备出发 →</button>`;
   }catch(e){toast('生成失败: '+e.message,'error');}
   btn.textContent='🗂️ 重新生成大纲';btn.disabled=false;
 }
@@ -1403,7 +1428,7 @@ function renderWordcountStep(el){
           <div class="style-desc">${s.desc}</div>
         </div>`).join('')}
     </div>
-    <button class="btn-primary" onclick="confirmWordcount()">确认，准备开始创作 →</button>`;
+    <button class="btn-primary" onclick="confirmWordcount()">确认字数，生成大纲 →</button>`;
 }
 
 function selectTier(label){
@@ -1428,7 +1453,7 @@ function renderReadyStep(el){
       <div style="font-size:72px;margin-bottom:16px;">🚀</div>
       <h3 style="color:var(--gold);font-size:22px;margin-bottom:8px;">万事俱备！</h3>
       <p style="color:var(--muted2);line-height:1.8;margin-bottom:8px;">《${p.settings?.title||'你的爽文'}》</p>
-      <p style="color:var(--muted);font-size:13px;margin-bottom:32px;">目标 ${p.wordTier?.words} · ${p.wordTier?.chapters}章 · 每章约2500字</p>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:32px;">目标 ${p.wordTier?.words} · ${p.wordTier?.chapters}章 · 大纲已就绪 · 每章约2500字</p>
       <button class="btn-primary" style="font-size:17px;padding:16px;" onclick="startWriting()">开始创作正文 ✍️</button>
     </div>`;
 }
