@@ -1824,12 +1824,16 @@ ${openingInstr}
 
   // 输出规范（所有模型通用）
   // 已用标题库，防止重复
-  const usedTitles=(usedTitlesList||[]).slice(-30).join('、');
+  const usedTitles=(usedTitlesList||[]).slice(-50).join('、');// 最多传50个已用标题
 
   const outputRules=`输出规范：
 【标题规范】第一行写"第${chNum}章 [标题]"，空行后开始正文。
-标题必须：①包含本章最大爽点或冲突关键词 ②吸引眼球让读者想点进来 ③绝对不得与以下已用标题重复或相似：${usedTitles||'（暂无）'}
-标题示例风格："一拳震山河""她凭什么""今天开始当大佬""打脸就要打彻底""这就是我的底牌"
+标题铁律（违反视为废稿）：
+①标题必须包含本章最大爽点或冲突的核心词
+②标题必须让读者看了就想点进来，有悬念或冲击感
+③以下标题已被使用，绝对禁止重复或相似（包括同义词替换）：${usedTitles?usedTitles:'（第一章，暂无已用标题）'}
+④每章标题必须独一无二，反映本章独有剧情
+标题参考风格（仅参考，不要照抄）："一拳震山河""她凭什么""今天开始当大佬""打脸就要打彻底""这就是我的底牌""装什么装""你配吗""老子不伺候了""让你们看看什么叫真正的强者"
 
 【字数规范】1800-2500字（硬性要求，不足1800必须补充，超过2500必须删减）。
 
@@ -2076,7 +2080,15 @@ async function buildChapterText(p,chNum){
     pacingHint,
     chNum,
     geneRadar:p.geneRadar||{},
-    usedTitles:(card.usedTitles||[]),
+    // 实时从已保存章节提取标题，100%准确不依赖异步更新
+    usedTitles:(()=>{
+      const titles=[];
+      (p.chapters||[]).forEach(ch=>{
+        const m=(ch.text||ch.summary||'').match(/第\d+章\s*(.{2,20})/);
+        if(m&&m[1])titles.push(m[1].trim());
+      });
+      return titles;
+    })(),
   };
 
   const providerId=state.selectedProvider||'deepseek';
