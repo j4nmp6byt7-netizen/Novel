@@ -1691,8 +1691,12 @@ async function generateBatch(){
 
   for(let i=0;i<count;i++){
     if(state.batchStop){batchLog('⏹ 已中断','warn');break;}
+
+    // 每次循环都从state重新读取最新项目状态，确保chNum正确
     const p=state.currentProject;
-    const chNum=(p.chapters?.length||0)+1;
+    if(!p.chapters)p.chapters=[];
+    const chNum=p.chapters.length+1;
+
     updateHeader(chNum,i,count);
     batchLog(`📝 第${chNum}章 生成中...`);
 
@@ -1703,26 +1707,28 @@ async function generateBatch(){
       const scoreResult=await quickScore(text);
       if(scoreResult.grade==='C'){
         batchLog(`⚠️ 第${chNum}章评分C(${scoreResult.score}分)，自动重生成...`,'warn');
-        text=await buildChapterText(p,chNum);
+        // 重生成时再次读最新状态
+        text=await buildChapterText(state.currentProject,chNum);
       }
 
-      // 保存章节（直接操作state，不触发UI重渲）
-      if(!p.history)p.history=[];
-      p.history.push({ver:p.history.length+1,time:Date.now(),chapterNum:chNum,text,desc:`第${chNum}章（批量）`});
+      // 保存章节——直接操作state.currentProject，确保下次循环能读到最新chapters
+      const proj=state.currentProject;
+      if(!proj.history)proj.history=[];
+      proj.history.push({ver:proj.history.length+1,time:Date.now(),chapterNum:chNum,text,desc:`第${chNum}章（批量）`});
       const chData={num:chNum,text,summary:text.slice(0,120),createdAt:Date.now(),score:scoreResult.score,grade:scoreResult.grade==='C'?'B':scoreResult.grade};
-      p.chapters=[...(p.chapters||[]),chData];
-      saveProject(p);
+      proj.chapters=[...proj.chapters,chData];
+      // 同步更新state.currentProject
+      state.currentProject=proj;
+      saveProject(proj);
 
-      // 异步更新故事卡，不阻塞
+      // 异步更新故事卡，不阻塞主循环
       updateStoryCard(text,chNum).catch(()=>{});
       successCount++;
       const wl=text.length;
       const gradeColor=chData.grade==='S'?'color:#ffd700':chData.grade==='A'?'color:#22c55e':'color:#f0a500';
-      batchLog(`✅ 第${chNum}章 ${wl}字 <span style="${gradeColor};font-weight:700;">${chData.grade}${chData.score}分</span>${wl<2400?' ⚠️偏少':''}（${i+1}/${count}）`,'ok');
+      batchLog(`✅ 第${chNum}章 ${wl}字 <span style="${gradeColor};font-weight:700;">${chData.grade}${chData.score}分</span>${wl<1700?' ⚠️偏少':''}（${i+1}/${count}）`,'ok');
 
-      // 只更新进度条和标题，不重渲整页
       updateHeader(chNum+1,i+1,count);
-
       if(i<count-1&&!state.batchStop)await sleep(600);
     }catch(e){
       batchLog(`❌ 第${chNum}章失败: ${e.message.slice(0,50)}`,'err');
