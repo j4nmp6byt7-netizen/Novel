@@ -754,6 +754,11 @@ function renderProjects(){
 }
 
 function openProject(id){
+  // 兼容旧项目，确保storyCard完整
+  const proj=state.projects.find(p=>p.id===id);
+  if(proj&&proj.storyCard&&!proj.storyCard.usedTitles){
+    proj.storyCard.usedTitles=[];
+  }
   state.currentProject=state.projects.find(p=>p.id===id);
   state.currentChapterDraft='';state.checkResult=null;state.forecast=null;
   if(state.currentProject.step==='writing')showScreen('writing');
@@ -764,10 +769,10 @@ function newProject(){
   state.currentProject={
     id:uid(),createdAt:Date.now(),updatedAt:Date.now(),
     step:'idea',idea:'',aiIdeaAnalysis:'',analysisResult:'',
-    geneRadar:{slap:70,upgrade:60,romance:30,mystery:50,emotion:80},
+    geneRadar:{slap:70,upgrade:60,romance:30,mystery:50,emotion:80,dark:20,swagger:60,fight:50,comedy:20,spicy:30},
     settings:{},customFields:[],outline:'',wordTier:WORD_TIERS[2],
     openingStyle:'ai',chapters:[],
-    storyCard:{characters:[],events:[],foreshadowing:[],emotionNodes:[]},
+    storyCard:{characters:[],events:[],foreshadowing:[],emotionNodes:[],usedTitles:[]},
     history:[],
   };
   showScreen('create');
@@ -1064,19 +1069,44 @@ async function runAnalysis(mode='full'){
 
 function renderAnalysisResult(analysis,radar){
   const r=radar||{slap:70,upgrade:60,romance:30,mystery:50,emotion:80};
-  const genes=[['slap','打脸密度'],['upgrade','升级速度'],['romance','感情线'],['mystery','悬念感'],['emotion','情绪张力']];
+  // 基因配置：[key, 标签, [0%注释, 50%注释, 100%注释]]
+  const genes=[
+    ['slap','🥊 打脸密度',['0%=几乎无打脸，靠升级推进','50%=每10章1次明显打脸','100%=每章都有打脸反击，爽感密集']],
+    ['upgrade','⚡ 升级速度',['0%=慢热成长，厚积薄发','50%=稳步提升，每卷一个大突破','100%=火箭升级，章章有收获']],
+    ['romance','💕 感情线浓度',['0%=无感情线，纯战斗爽文','50%=有感情线但不影响主线','100%=感情线与主线并重，甜虐交织']],
+    ['mystery','🔮 悬念密度',['0%=剧情直给，无悬念','50%=每卷有1-2个大谜题','100%=层层悬念，每章结尾都有钩子']],
+    ['emotion','🌊 情绪张力',['0%=平铺直叙，情绪平稳','50%=情绪有起伏，关键场景爆发','100%=情绪极致，委屈-爆发-爽感循环密集']],
+    ['dark','🌑 黑化程度',['0%=主角正派阳光，手段光明','50%=该狠时狠，有谋略有手腕','100%=腹黑冷酷，以彼之道还施彼身']],
+    ['swagger','😎 装逼含量',['0%=低调务实，不屑炫耀','50%=偶尔出手震场，一鸣惊人','100%=全程装逼，打脸套装，震惊全场']],
+    ['fight','⚔️ 战斗场面',['0%=战斗描写简短，点到为止','50%=战斗有质感，关键战重点描写','100%=硬核战斗流，每场战斗细致热血']],
+    ['comedy','😄 搞笑轻松度',['0%=全程严肃，无喜剧成分','50%=有幽默段子调节节奏','100%=爆笑流，搞笑与爽感并重']],
+    ['spicy','🌶️ 擦边尺度',['0%=完全回避，无任何亲密描写','50%=适度暧昧氛围，吻戏/拥抱/眼神拉丝','100%=全套感官描写+留白收尾，呼吸交缠肌肤相贴']],
+  ];
+
+  function getGeneAnnotation(key,val){
+    const g=genes.find(x=>x[0]===key);
+    if(!g)return'';
+    const annotations=g[2];
+    if(val<=15)return annotations[0];
+    if(val<=60)return annotations[1];
+    return annotations[2];
+  }
+
   return `
     <div class="analysis-box">
       <div class="analysis-title">📊 爽文基因报告</div>
       <div class="analysis-content">${analysis}</div>
     </div>
     <div class="section" style="margin-top:12px;">
-      <div class="section-title">🎛️ 爽文基因雷达 - 调节比例</div>
-      ${genes.map(([k,l])=>`
-        <div class="slider-row">
-          <span class="slider-label">${l}</span>
-          <input type="range" class="slider-input" min="0" max="100" value="${r[k]}" oninput="updateGene('${k}',this.value)">
-          <span class="slider-val" id="gene-val-${k}">${r[k]}%</span>
+      <div class="section-title">🎛️ 爽文基因雷达 — 调节比例</div>
+      ${genes.map(([k,l,])=>`
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+            <span style="color:var(--text);font-size:13px;font-weight:700;">${l}</span>
+            <span style="color:var(--gold);font-size:13px;font-weight:700;" id="gene-val-${k}">${r[k]||0}%</span>
+          </div>
+          <input type="range" class="slider-input" min="0" max="100" value="${r[k]||0}" oninput="updateGene('${k}',this.value)" style="width:100%;margin-bottom:4px;">
+          <div style="color:var(--muted);font-size:11px;line-height:1.4;" id="gene-ann-${k}">${getGeneAnnotation(k,r[k]||0)}</div>
         </div>`).join('')}
     </div>
     <button class="btn-primary" onclick="confirmAnalysis()">确认基因配置，进入设定 →</button>`;
@@ -1084,7 +1114,29 @@ function renderAnalysisResult(analysis,radar){
 
 function updateGene(k,v){
   state.currentProject.geneRadar[k]=Number(v);
-  document.getElementById('gene-val-'+k).textContent=v+'%';
+  const valEl=document.getElementById('gene-val-'+k);
+  if(valEl)valEl.textContent=v+'%';
+  // 更新注释文字
+  const annEl=document.getElementById('gene-ann-'+k);
+  if(annEl){
+    const annotations={
+      slap:['0%=几乎无打脸，靠升级推进','50%=每10章1次明显打脸','100%=每章都有打脸反击，爽感密集'],
+      upgrade:['0%=慢热成长，厚积薄发','50%=稳步提升，每卷一个大突破','100%=火箭升级，章章有收获'],
+      romance:['0%=无感情线，纯战斗爽文','50%=有感情线但不影响主线','100%=感情线与主线并重，甜虐交织'],
+      mystery:['0%=剧情直给，无悬念','50%=每卷有1-2个大谜题','100%=层层悬念，每章结尾都有钩子'],
+      emotion:['0%=平铺直叙，情绪平稳','50%=情绪有起伏，关键场景爆发','100%=情绪极致，委屈-爆发-爽感循环密集'],
+      dark:['0%=主角正派阳光，手段光明','50%=该狠时狠，有谋略有手腕','100%=腹黑冷酷，以彼之道还施彼身'],
+      swagger:['0%=低调务实，不屑炫耀','50%=偶尔出手震场，一鸣惊人','100%=全程装逼，打脸套装，震惊全场'],
+      fight:['0%=战斗描写简短，点到为止','50%=战斗有质感，关键战重点描写','100%=硬核战斗流，每场战斗细致热血'],
+      comedy:['0%=全程严肃，无喜剧成分','50%=有幽默段子调节节奏','100%=爆笑流，搞笑与爽感并重'],
+      spicy:['0%=完全回避，无任何亲密描写','50%=适度暧昧氛围，吻戏/拥抱/眼神拉丝','100%=全套感官描写+留白收尾，呼吸交缠肌肤相贴'],
+    };
+    const ann=annotations[k];
+    if(ann){
+      const nv=Number(v);
+      annEl.textContent=nv<=15?ann[0]:nv<=60?ann[1]:ann[2];
+    }
+  }
 }
 
 function confirmAnalysis(){
@@ -1737,23 +1789,51 @@ ${intervention?'\n【特别指令——必须执行】'+intervention:''}
 ${openingInstr}
 【本章节奏】${pacingHint}`;
 
-  // 番茄爆款公式（所有模型通用）
-  const tomatoFormula=`番茄爆款公式：
-· 对话占比35-45%，动作描写30%，心理描写不超过15%，环境描写不超过10%
-· 每章必须有至少一个"小高潮"（打脸/突破/揭秘/反转/爽点之一）
-· 禁止大段风景描写和背景交代，场景必须推动情节
-· 主角形象：处变不惊，说话简短有力，行动优先于思考
-· 爽点前必须有铺垫（委屈/压迫/怀疑），爽点后必须有余波（震惊/佩服/恐惧）`;
+  // 根据10维基因生成专属写作指令
+  const radar=p?.geneRadar||{};
+  function geneLevel(v){return v<=20?'低':v<=60?'中':'高';}
+  const spicyVal=radar.spicy||0;
+  const spicyInstr=spicyVal<=15?'感情线保持清淡，无亲密描写，专注剧情和战斗。'
+    :spicyVal<=60?`感情线适度暧昧：可以写吻、拥抱、眼神拉丝、心跳加速，用感官描写营造氛围，点到为止。`
+    :`感情线全力拉满（符合平台规范）：快速进入亲密场景，写吻、抚摸、压在床上、肌肤相贴、喘息、低哑嗓音，用大量触感/温度/心跳/视线描写代替直接描写，在最关键时用"夜色""被子""灯光""意识模糊"等方式自然留白，结尾以温柔克制或害羞满足收尾。严禁：直接性器官描写、"插入""性交""做爱"等明确词汇。`;
+
+  const tomatoFormula=`番茄爆款公式（严格执行）：
+· 对话35-45%，动作30%，心理≤15%，环境≤10%
+· 每章必须有至少一个小高潮（打脸/突破/揭秘/反转之一）
+· 场景必须推动情节，禁止大段背景交代
+· 主角：处变不惊，说话简短有力，行动优先于思考
+· 爽点前有铺垫（委屈/压迫），爽点后有余波（震惊/恐惧）
+
+【本书专属基因配置】
+打脸密度${geneLevel(radar.slap||70)}（${radar.slap||70}%）：${(radar.slap||70)>60?'打脸场景密集，每几章必须有一次被怼后反击':(radar.slap||70)>30?'适度打脸，关键节点有反击':'剧情推进为主，打脸较少'}
+升级速度${geneLevel(radar.upgrade||60)}（${radar.upgrade||60}%）：${(radar.upgrade||60)>60?'快速升级，读者每章都能看到成长':'稳步提升，每卷有重要突破'}
+悬念密度${geneLevel(radar.mystery||50)}（${radar.mystery||50}%）：${(radar.mystery||50)>60?'层层悬念，每章结尾必须有钩子':'关键章节埋悬念，整体推进流畅'}
+情绪张力${geneLevel(radar.emotion||80)}（${radar.emotion||80}%）：${(radar.emotion||80)>60?'情绪极致化，委屈-爆发-爽感密集循环':'情绪有起伏，关键场景强化'}
+黑化程度${geneLevel(radar.dark||20)}（${radar.dark||20}%）：${(radar.dark||20)>60?'主角腹黑冷酷，以彼之道还施彼身':(radar.dark||20)>30?'该狠时狠，有谋略':'主角正派，手段光明'}
+装逼含量${geneLevel(radar.swagger||60)}（${radar.swagger||60}%）：${(radar.swagger||60)>60?'全程装逼打脸，震惊全场':(radar.swagger||60)>30?'偶尔低调出手，一鸣惊人':'低调务实，实力说话'}
+战斗场面${geneLevel(radar.fight||50)}（${radar.fight||50}%）：${(radar.fight||50)>60?'硬核战斗流，每场战斗细致热血':(radar.fight||50)>30?'战斗有质感，关键战重点描写':'战斗简短，点到为止'}
+搞笑轻松度${geneLevel(radar.comedy||20)}（${radar.comedy||20}%）：${(radar.comedy||20)>60?'爆笑流，幽默贯穿全文':(radar.comedy||20)>30?'有幽默段子调节节奏':'全程严肃'}
+感情线：${spicyInstr}`;
 
   // 输出规范（所有模型通用）
+  // 已用标题库，防止重复
+  const usedTitles=(card.usedTitles||[]).slice(-30).join('、');
+
   const outputRules=`输出规范：
-第一行写"第${chNum}章 [标题]"，空行后开始正文。
-字数1800-2500字（硬性要求，不足1800必须补充，超过2500必须删减）。
-开头第一句必须直接延续上章结尾场景，不得另起炉灶，不得时间跳跃。
-每500-700字安排一个情绪推进或小爽点。
-短句为主（单句不超过25字），对话后空行，情绪爆发时单句成段。
-结尾必须是强钩子（悬念/冲突/反转），让读者迫不及待翻下一章。
-口语化文风，有温度有人情味，禁止说教腔、AI排比腔。
+【标题规范】第一行写"第${chNum}章 [标题]"，空行后开始正文。
+标题必须：①包含本章最大爽点或冲突关键词 ②吸引眼球让读者想点进来 ③绝对不得与以下已用标题重复或相似：${usedTitles||'（暂无）'}
+标题示例风格："一拳震山河""她凭什么""今天开始当大佬""打脸就要打彻底""这就是我的底牌"
+
+【字数规范】1800-2500字（硬性要求，不足1800必须补充，超过2500必须删减）。
+
+【衔接规范】开头第一句话必须直接延续上章最后一幕的具体场景和动作，不得时间跳跃，不得切换场景，不得重新介绍背景。
+正确示例：上章结尾"他抬起头，看见了那个不该出现在这里的人"→本章开头"那人站在门口，脸上带着一丝意味深长的笑"
+错误示例：另起一个全新场景，或用"话说三天后""却说此时"等跳跃方式开头
+
+【节奏规范】每500-700字安排一个情绪推进或小爽点，全章至少1个明显高潮。
+【排版规范】短句为主（单句不超过25字），对话后空行，情绪爆发时单句成段。
+【结尾规范】必须是强钩子（悬念/冲突/反转），让读者迫不及待翻下一章。
+【文风规范】口语化，有温度，禁止说教腔、AI排比腔。
 禁词：却说/话说/笔者/（注）/综上所述/不得不说/值得一提。`;
 
   switch(providerId){
@@ -2020,7 +2100,13 @@ async function generateChapter(){
 
 async function updateStoryCard(text,chNum){
   try{
-    // 单次请求同时提取故事卡信息和收尾快照，节省token
+    // 提取章节标题
+    const titleMatch=text.match(/第\d+章[\s\uff00-\uffef]*([^\n\r]{2,20})/);
+    const chTitle=titleMatch?titleMatch[2].trim():'';
+    // 更新已用标题库
+    if(!state.currentProject.storyCard.usedTitles)state.currentProject.storyCard.usedTitles=[];
+    if(chTitle)state.currentProject.storyCard.usedTitles.push(chTitle);
+
     const res=await callAI([{role:'user',content:`提取以下小说章节的关键信息，只输出JSON，不要其他内容：
 {
   "newChars":["新出场人物名字"],
@@ -2046,7 +2132,8 @@ async function updateStoryCard(text,chNum){
     if(lastCh&&info.endingSnapshot){
       lastCh.endingSnapshot=info.endingSnapshot;
     }
-  }catch(e){console.log('故事卡更新失败',e);}
+  }catch(e){
+}
 }
 
 async function selfCheck(){
@@ -2271,7 +2358,8 @@ S级90+，A级75-89，B级60-74，C级60以下。
       // 如果当前在章节列表页则刷新
       if(state.writeTab==='chapters')renderChaptersTab(document.getElementById('write-tab-content'));
     }
-  }catch(e){console.log('自动评分失败',e);}
+  }catch(e){
+}
 }
 
 async function generateForecast(){
@@ -2576,7 +2664,7 @@ function renderCardTab(el){
 
 function toggleEditCard(){
   if(state.editingCard){
-    const card=state.currentProject.storyCard||{};
+    const card=state.currentProject.storyCard||{characters:[],events:[],foreshadowing:[],emotionNodes:[],usedTitles:[]};
     document.querySelectorAll('[data-ck]').forEach(el=>{
       card[el.dataset.ck]=el.value.split('\n').filter(Boolean);
     });
