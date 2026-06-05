@@ -1764,7 +1764,8 @@ function buildPromptByModel(providerId,coreData){
   const {title,genre,tone,protagonist,ability,hookPoints,forbidden,
          outlineRef,characters,recentEvents,foreshadowing,
          lastSnap,prevRawEnding,prevSummary,prevPrevSummary,
-         intervention,openingInstr,pacingHint,chNum,geneRadar:radarData}=coreData;
+         intervention,openingInstr,pacingHint,chNum,geneRadar:radarData,
+         usedTitles:usedTitlesList}=coreData;
 
   // 所有模型共用的核心内容块
   const coreBlock=`【书名】${title}｜【类型】${genre}｜【基调】${tone}
@@ -1817,7 +1818,7 @@ ${openingInstr}
 
   // 输出规范（所有模型通用）
   // 已用标题库，防止重复
-  const usedTitles=(card.usedTitles||[]).slice(-30).join('、');
+  const usedTitles=(usedTitlesList||[]).slice(-30).join('、');
 
   const outputRules=`输出规范：
 【标题规范】第一行写"第${chNum}章 [标题]"，空行后开始正文。
@@ -2069,6 +2070,7 @@ async function buildChapterText(p,chNum){
     pacingHint,
     chNum,
     geneRadar:p.geneRadar||{},
+    usedTitles:(card.usedTitles||[]),
   };
 
   const providerId=state.selectedProvider||'deepseek';
